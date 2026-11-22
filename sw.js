@@ -53,7 +53,7 @@ async function trocar(m) {
 }
 
 // Pergunta ao servidor pelo manifesto. Devolve o que passou a valer (o novo, ou o guardado se o servidor não respondeu).
-function atualizar(ms) {
+function atualizar(ms, multiplayer = false) {
   if (!buscando) buscando = (async () => {
     const antes = await manifesto();
     try {
@@ -61,8 +61,10 @@ function atualizar(ms) {
       const t = setTimeout(() => ctl.abort(), ms || ESPERA_MS);
       let m = null, semCliente = false;
       try {
-        const r = await fetch(CATALOGO, { cache: 'no-store', signal: ctl.signal });
-        if (r.ok) m = await r.json();
+        const legado = self.location.hostname === 'kraft.k14.uk' && !multiplayer;
+        const fonte = legado ? 'https://kadkok.github.io/kraft-cliente/origem/kraft-cliente.json' : CATALOGO;
+        const r = await fetch(fonte, { cache: 'no-store', signal: ctl.signal, credentials: legado ? 'omit' : 'same-origin', referrerPolicy: 'no-referrer' });
+        if (r.ok) { m = await r.json(); if (legado && m) m.distribuicaoExterna = true; }
         else if (r.status === 404 || r.status === 410) semCliente = true;
       } finally { clearTimeout(t); }
       if (semCliente) {
@@ -80,7 +82,7 @@ function atualizar(ms) {
             try {
               while (!falhou && i < fila.length) {
                 const [p, reg] = fila[i++];
-                if (!await instalarArquivo(c, p, reg)) falhou = true;
+                if (!await instalarArquivo(c, p, reg, m)) falhou = true;
               }
             } catch { falhou = true; }
           };
@@ -114,19 +116,21 @@ const semAspas = (etag) => String(etag || '').replace(/^W\//, '').replace(/^"|"$
 const mesmaMarca = (etag, marca) => etag === marca || (etag.startsWith(marca) && /^-(zstd|gzip|br)$/.test(etag.slice(marca.length)));
 
 // Clientes instalados no endereço histórico conservam os mundos no mesmo armazenamento.
-async function guardarDaDistribuicao(c,p,reg) {
-  if (self.location.hostname !== 'kraft.k14.uk' || !/^\/(assets|audio|vendor)\//.test(p)) return false;
+async function guardarDaDistribuicao(c,p,reg,m) {
+  if (self.location.hostname !== 'kraft.k14.uk' || (!m?.distribuicaoExterna && !/^\/(assets|audio|vendor)\//.test(p))) return false;
   try {
-    const url = new URL('https://kadkok.github.io/kraft-cliente' + p);
+    const pasta = m?.distribuicaoExterna && m.caminhosOriginais?.includes(p) ? '/origem' : '';
+    const url = new URL('https://kadkok.github.io/kraft-cliente' + pasta + p);
     url.searchParams.set('v',reg[0]);
     const r = await fetch(url, { credentials:'omit', referrerPolicy:'no-referrer' });
     return r.status === 200 && await guardar(c,p,r,reg);
   } catch { return false; }
 }
 
-async function instalarArquivo(c, p, reg) {
+async function instalarArquivo(c, p, reg, m) {
   if (await c.match(chaveDe(p, reg[0]))) return true;
-  if (await guardarDaDistribuicao(c,p,reg)) return true;
+  if (await guardarDaDistribuicao(c,p,reg,m)) return true;
+  if (m?.distribuicaoExterna) return false;
   const r = await fetch(p, { cache: 'no-cache', credentials: 'same-origin' });
   if (r.status !== 200) return false;
   return guardar(c, p, r, reg);
@@ -153,14 +157,15 @@ async function responder(e, req, p) {
   if (req.mode === 'navigate') {
     const q = new URL(req.url).searchParams;
     const multi = q.get('partida') === 'multiplayer' || (!q.has('partida') && q.has('mundo'));
-    if (!m || multi) m = await atualizar(ESPERA_MS);
+    if (!m || multi) m = await atualizar(ESPERA_MS,multi);
   }
   const reg = m && m.arquivos[p];
   if (!reg) return fetch(req);
   const c = await caches.open(ARQUIVOS);
   const tem = await c.match(chaveDe(p, reg[0]));
   if (tem) return tem;
-  if (await guardarDaDistribuicao(c,p,reg)) return c.match(chaveDe(p,reg[0]));
+  if (await guardarDaDistribuicao(c,p,reg,m)) return c.match(chaveDe(p,reg[0]));
+  if (m.distribuicaoExterna) return new Response(null,{status:503});
   const res = await fetch(p, { cache: 'no-cache', credentials: 'same-origin' });
   // só guarda o que é mesmo o arquivo do manifesto: se o servidor já trocou de versão, a marca não bate e passa direto
   if (res.status === 200 && res.type === 'basic') {
@@ -174,7 +179,12 @@ async function faixaGuardada(req, p) {
   const m = await manifesto(), reg = m?.arquivos[p];
   const intervalo = /^bytes=(\d*)-(\d*)$/i.exec(req.headers.get('range'));
   if (!reg || !intervalo || !(intervalo[1] || intervalo[2])) return fetch(req);
-  const r = await (await caches.open(ARQUIVOS)).match(chaveDe(p, reg[0]));
+  const cache = await caches.open(ARQUIVOS);
+  let r = await cache.match(chaveDe(p, reg[0]));
+  if (!r && m.distribuicaoExterna) {
+    if (!await guardarDaDistribuicao(cache,p,reg,m)) return new Response(null,{status:503});
+    r = await cache.match(chaveDe(p,reg[0]));
+  }
   if (!r) return fetch(req);
   const n = reg[1], de = intervalo[1] ? Number(intervalo[1]) : Math.max(0, n - Number(intervalo[2]));
   const ate = intervalo[1] && intervalo[2] ? Math.min(n - 1, Number(intervalo[2])) : n - 1;
@@ -229,7 +239,7 @@ self.addEventListener('message', (e) => {
   const devolve = (x) => { if (porta) porta.postMessage(x); };
   if (d.t === 'arquivo') e.waitUntil((async () => {
     const m = await manifesto(), reg = m?.arquivos[d.p];
-    return !!reg && m.versao === d.versao && await instalarArquivo(await caches.open(ARQUIVOS), d.p, reg);
+    return !!reg && m.versao === d.versao && await instalarArquivo(await caches.open(ARQUIVOS), d.p, reg, m);
   })().then(devolve, () => devolve(false)));
   else if (d.t === 'concluir') e.waitUntil((async () => {
     const st = await estado(true);
@@ -240,7 +250,7 @@ self.addEventListener('message', (e) => {
     return true;
   })().then(devolve, () => devolve(false)));
   else if (d.t === 'estado') e.waitUntil(estado(d.faltam).then(devolve, () => devolve(null)));
-  else if (d.t === 'atualizar') e.waitUntil(atualizar(d.ms || 8000).then((m) => devolve({ versao: m ? m.versao : null }), () => devolve(null)));
+  else if (d.t === 'atualizar') e.waitUntil(atualizar(d.ms || 8000, d.multiplayer === true).then((m) => devolve({ versao: m ? m.versao : null }), () => devolve(null)));
   else if (d.t === 'esquecer') e.waitUntil((async () => {
     const m = await manifesto();
     if (m) await trocar({ ...m, instalacaoCompleta: false });

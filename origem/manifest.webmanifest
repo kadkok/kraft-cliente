@@ -1,0 +1,21 @@
+{
+  "name": "Kraft",
+  "short_name": "Kraft",
+  "description": "Um mundo de blocos com luz de verdade, para jogar com quem você quiser.",
+  "lang": "pt-BR",
+  "id": "/",
+  "start_url": "/?partida=solo",
+  "scope": "/",
+  "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone"],
+  "orientation": "landscape",
+  "background_color": "#0d1620",
+  "theme_color": "#0d1620",
+  "categories": ["games"],
+  "icons": [
+    { "src": "icones/kraft-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icones/kraft-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icones/kraft-cheio-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}

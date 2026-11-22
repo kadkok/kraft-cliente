@@ -16,6 +16,7 @@
 // Para os outros sistemas: game.mar = { ligado, altura(x, z) → y da superfície agora, prof(x, z), s(x, z), tempo }.
 import * as THREE from '../three.js';
 import { U, COMMON } from './materials.js';
+import { RAIO_GELO } from '../../shared/fortaleza.js';
 import { mascaraNaMare } from '../../shared/ferrovia-terreno.js';
 import { MAR_GLSL, MAR_NIVEL, alturaMar, estadoDoTempo, multMar } from '../../shared/mar.js';
 import { B } from '../../shared/blocks.js';
@@ -286,7 +287,9 @@ uniform vec4 uMarCaixa;
 uniform vec3 uWaterColor, uWaterShallow;
 in vec3 vVirt;
 uniform sampler2D uGaleria;
-uniform vec3 uGaleriaCaixa;
+uniform vec3 uGaleriaCaixa, uGeleira;
+uniform ivec2 uOrigemChunks;
+uniform sampler2D uChunksComMalha;
 out vec4 outColor;
 ${MAR_GLSL}
 const float MAR_NIVEL = ${MAR_NIVEL.toFixed(3)};
@@ -300,6 +303,14 @@ float ggx(float nh, float r) { float a2 = r * r * r * r; float d = nh * nh * (a2
 
 void main() {
   vec3 P = vVirt;
+  if (uGeleira.z > 0.0) {
+    vec2 dxz = floor(P.xz) - uGeleira.xy;
+    if (dot(dxz, dxz) <= uGeleira.z) {
+      ivec2 ch = ivec2(floor(P.xz / 16.0)) - uOrigemChunks;
+      if (all(greaterThanEqual(ch, ivec2(0))) && all(lessThan(ch, textureSize(uChunksComMalha, 0)))
+          && texelFetch(uChunksComMalha, ch, 0).r > 0.0) discard;
+    }
+  }
   if (uGaleriaCaixa.z > 0.0) {
     vec2 uv = (P.xz - uGaleriaCaixa.xy) / uGaleriaCaixa.z;
     if (all(greaterThanEqual(uv,vec2(0))) && all(lessThan(uv,vec2(1)))) {
@@ -411,8 +422,11 @@ export function initOceano({ scene, camera, game, world }) {
   const texturaGaleria = new THREE.DataTexture(dadosGaleria, ladoGaleria, ladoGaleria, THREE.RGFormat);
   texturaGaleria.needsUpdate = true;
   let indiceGaleria, ultimoX, ultimoZ;
+  const uOrigemChunks = { value: new THREE.Vector2() };
+  const uChunksComMalha = { value: null };
   const uniforms = {
     ...U,
+    uOrigemChunks, uChunksComMalha, uGeleira: { value: new THREE.Vector3() },
     uGaleria: {value: texturaGaleria}, uGaleriaCaixa: {value: new THREE.Vector3()},
     uMarCentro: { value: new THREE.Vector3() },
     uMarVento: { value: new THREE.Vector3(0.83, 0.55, 0.85) },
@@ -442,8 +456,6 @@ export function initOceano({ scene, camera, game, world }) {
   const relevo = new THREE.Group();
   relevo.name = 'relevo-distante';
   scene.add(relevo);
-  const uOrigemChunks = { value: new THREE.Vector2() };
-  const uChunksComMalha = { value: null };
   let mascara = null, mascaraNova = null;
   function atualizarChunks(x, z) {
     const r = (world?.radius || 10) + 5, lado = 2 * r + 1;
@@ -508,6 +520,9 @@ export function initOceano({ scene, camera, game, world }) {
     }
     if (!visivel) return;
     const c = camera.getWorldPosition(cam);
+    const gelo = gen.fortaleza;
+    const pertoDoGelo = gelo && Math.abs(c.x - gelo[0]) < 700 && Math.abs(c.z - gelo[1]) < 700;
+    uniforms.uGeleira.value.set(gelo?.[0] ?? 0, gelo?.[1] ?? 0, pertoDoGelo ? RAIO_GELO ** 2 : 0);
     atualizarChunks(c.x, c.z);
     const corredores = game.ferrovia?.corredores;
     if (corredores?.size || indiceGaleria) {

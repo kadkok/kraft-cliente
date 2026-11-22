@@ -91,7 +91,7 @@ export function initCliente({ game, net, ui, device, settings, params }) {
       if (baixando) return;
       ui.toast('Verificando a atualização do cliente…');
       if (api.ligado) {
-        const r = await pedir({ t: 'atualizar', ms: 15000 }, 300000);
+        const r = await pedir({ t: 'atualizar', ms: 15000, multiplayer: net.online }, 300000);
         if (!r || r.versao === api.versao) { ui.toast('O aparelho continua com a versão instalada.'); return; }
       }
       game.recarregar();
@@ -130,7 +130,7 @@ export function initCliente({ game, net, ui, device, settings, params }) {
       if (!api.ligado) { avisar(); return; }
       pedir({ t: 'estado' }).then((st) => { if (st && st.versao) { api.versao = st.versao; net.setBootBuild(st.versao, !document.querySelector('meta[name="kraft-multiplayer"]')); avisar(); } });
       // antes de recarregar por ordem do servidor, o aparelho busca a versão nova (até 8 s; sem resposta, recarrega assim mesmo)
-      net.beforeReload = () => pedir({ t: 'atualizar', ms: 12000 }, 300000);
+      net.beforeReload = () => pedir({ t: 'atualizar', ms: 12000, multiplayer: true }, 300000);
       avisar();
     };
     navigator.serviceWorker.addEventListener('controllerchange', assumir);
