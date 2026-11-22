@@ -1,0 +1,55 @@
+{
+ "feito_em": "2026-11-19",
+ "lado": 1024,
+ "materiais": {
+  "grama": {
+   "origem": "forrest_ground_01",
+   "fonte": "https://polyhaven.com/a/forrest_ground_01",
+   "licenca": "CC0 1.0",
+   "autores": [
+    "Rob Tuytel"
+   ],
+   "metros": 2.0,
+   "media": [
+    0.1377,
+    0.1169,
+    0.0557
+   ],
+   "cor": "grama.cor.jpg",
+   "sup": "grama.sup.jpg"
+  },
+  "folhas": {
+   "origem": "forest_leaves_03",
+   "fonte": "https://polyhaven.com/a/forest_leaves_03",
+   "licenca": "CC0 1.0",
+   "autores": [
+    "Rob Tuytel",
+    "Dimitrios Savva"
+   ],
+   "metros": 2.3,
+   "media": [
+    0.0442,
+    0.0276,
+    0.0096
+   ],
+   "cor": "folhas.cor.jpg",
+   "sup": "folhas.sup.jpg"
+  },
+  "casca": {
+   "origem": "bark_brown_02",
+   "fonte": "https://polyhaven.com/a/bark_brown_02",
+   "licenca": "CC0 1.0",
+   "autores": [
+    "Rob Tuytel"
+   ],
+   "metros": 1.0,
+   "media": [
+    0.0725,
+    0.059,
+    0.0347
+   ],
+   "cor": "casca.cor.jpg",
+   "sup": "casca.sup.jpg"
+  }
+ }
+}

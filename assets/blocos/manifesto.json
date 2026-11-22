@@ -1,0 +1,48 @@
+{
+ "v": "c13b516c83",
+ "dmax": 0.125,
+ "tamanhos": [
+  64,
+  128,
+  256
+ ],
+ "camadas": {
+  "stone": {
+   "nome": "Pedra"
+  },
+  "sandstone": {
+   "nome": "Arenito"
+  },
+  "planks": {
+   "nome": "Tábuas"
+  },
+  "basalt": {
+   "nome": "Basalto / Ônix"
+  },
+  "gravel": {
+   "nome": "Cascalho / Seixos"
+  },
+  "stone_bricks": {
+   "nome": "Tijolo de Pedra"
+  },
+  "bricks": {
+   "nome": "Alvenaria"
+  },
+  "clay": {
+   "nome": "Argila / Estuque"
+  },
+  "plaster_dark": {
+   "nome": "Ladrilho / Gesso Escuro"
+  }
+ },
+ "fora": {
+  "marble": {
+   "nome": "Mármore",
+   "motivo": "foto escura no lugar do branco: o Kadmus sentiu falta do mármore branco com veios (16/11); arquivo mantido"
+  },
+  "plaster_white": {
+   "nome": "Gesso Claro",
+   "motivo": "foto escura no lugar do branco: o Kadmus sentiu falta do mármore branco com veios (16/11); arquivo mantido"
+  }
+ }
+}

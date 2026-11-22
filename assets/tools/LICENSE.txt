@@ -1,0 +1,7 @@
+FREE16x16 Pixel Tools by iami55
+https://iami55.itch.io/free-16x16-pixel-tools
+CC0, personal/commercial use permitted, no attribution required.
+Original upload: tools.zip; source hash and archive preserved in quarantine.
+Selected axe/pickaxe/spade/sword in wood/stone/iron/crystal, variant1. Original PNGs are10x pixel-art exports160/200/250px; geometry follows their16/20/25px silhouette. No Mojang art used.
+Adaptation: axe/shovel/sword use extruded exposed pixels in render/equipment.js.
+Pickaxe refined in render/pickaxe-model.js: continuous curved/beveled silhouette, wood handle/grip and collar;440 triangles, two shared material classes. Original code-assisted modeling derived from the licensed tool concept; no Mojang assets.

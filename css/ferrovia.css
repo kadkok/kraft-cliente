@@ -1,0 +1,126 @@
+.ferrovia-editor[hidden],
+.ferrovia-abrir[hidden],
+.ferrovia-embarque[hidden] {
+  display: none;
+}
+.ferrovia-editor,
+.ferrovia-embarque {
+  color: #f3f5ee;
+  background: #142423f5;
+  border: 1px solid #63817d;
+  border-radius: 0.75rem;
+  font:
+    500 0.85rem/1.4 system-ui,
+    sans-serif;
+  box-shadow: 0 0.35rem 1.3rem #0005;
+}
+.ferrovia-abrir,
+.ferrovia-editor button,
+.ferrovia-embarque button {
+  font: inherit;
+  font-weight: 650;
+  min-height: 2.35rem;
+  padding: 0.25rem 0.6rem;
+  background: #334b48;
+  color: #f3f5ee;
+  border: 1px solid #647d77;
+  border-radius: 0.45rem;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.ferrovia-editor {
+  position: absolute;
+  bottom: max(0.7rem, env(safe-area-inset-bottom));
+  left: max(0.7rem, env(safe-area-inset-left));
+  padding: 0.8rem;
+  width: min(22rem, calc(100% - 5rem));
+  max-height: calc(100% - 5.5rem);
+  max-width: calc(100% - 1.4rem);
+  resize: both;
+  overflow: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  box-sizing: border-box;
+  user-select: text;
+}
+.ferrovia-editor.ampliado {
+  width: calc(100% - 1.4rem) !important;
+  height: calc(100% - 5.5rem) !important;
+}
+.ferrovia-editor label,
+.ferrovia-titulo,
+.ferrovia-presets,
+.ferrovia-acoes,
+.ferrovia-embarque {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+.ferrovia-editor label,
+.ferrovia-titulo {
+  justify-content: space-between;
+  margin-bottom: 0.38rem;
+}
+.ferrovia-editor input,
+.ferrovia-editor select {
+  min-width: 0;
+  width: 58%;
+  box-sizing: border-box;
+  font: inherit;
+  color: inherit;
+  background: #203531;
+  border: 1px solid #628078;
+  border-radius: 0.3rem;
+  padding: 0.33rem;
+}
+.ferrovia-editor input[type='number'] {
+  width: 5.8rem;
+}
+.ferrovia-editor p {
+  margin: 0.45rem 0;
+  color: #cad6ce;
+}
+.ferrovia-editor output {
+  display: block;
+  margin: 0.4rem 0;
+  min-height: 2.5em;
+}
+.ferrovia-presets,
+.ferrovia-acoes {
+  flex-wrap: wrap;
+}
+.ferrovia-editor [data-a='salvar'] {
+  margin-left: auto;
+  background: #b4d4bb;
+  color: #12251b;
+}
+.ferrovia-editor button:disabled,
+.ferrovia-embarque button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.ferrovia-embarque {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 19%;
+  z-index: 18;
+  padding: 0.4rem 0.6rem;
+  max-width: 90vw;
+  pointer-events: none;
+}
+.ferrovia-embarque button {
+  white-space: nowrap;
+}
+@media (max-height: 540px) {
+  .ferrovia-editor {
+    max-height: calc(100% - 4rem);
+    font-size: 0.75rem;
+  }
+  .ferrovia-editor p {
+    margin: 0;
+  }
+  .ferrovia-editor button {
+    min-height: 1.85rem;
+  }
+}

@@ -1,0 +1,6 @@
+Photorealistic Texture Packs1 and3 — Screaming Brain Studios, CC0/Public Domain.
+https://screamingbrainstudios.itch.io/photorealistic-texture-pack
+https://screamingbrainstudios.itch.io/photorealistic-texture-pack-3
+Official free512 PNGs preserved in quarantine with archive/file hashes. Selected photographs reduced256, some recolored/desaturated. Surface normals/roughness are approximations derived by the existing Lavra pipeline, not measured PBR scans.
+Leaf branches, needles, grass and flowers: original illustrations by code assisted for Lavra, not extracted from reference images.
+Reproduce with tools/prepare-terrain.py. Sources by layer in manifest.json.

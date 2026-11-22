@@ -1,0 +1,252 @@
+{
+  "stone": {
+    "source": "pack1/512x512/Stone/Photoreal_Stone_04-512x512.png",
+    "sha256": "be9148ecf512e3abd93a14583c506bccfd9c23808888b8c505440761a68b9b4f",
+    "license": "CC0",
+    "creator": "Screaming Brain Studios",
+    "diffuseLook": {
+      "center": [
+        120,
+        120,
+        115
+      ],
+      "contrast": 0.38,
+      "chroma": 0.22
+    }
+  },
+  "stone_bricks": {
+    "source": "pack1/512x512/Stone/Photoreal_Stone_03-512x512.png",
+    "sha256": "b697a18c3e51df0751e3eb2c74198e708ad9daccaf1e87efab2564a8a4b095cb",
+    "license": "CC0",
+    "creator": "Screaming Brain Studios",
+    "diffuseLook": {
+      "center": [
+        127,
+        125,
+        117
+      ],
+      "contrast": 0.38,
+      "chroma": 0.2
+    }
+  },
+  "dirt": {
+    "source": "pack3/512x512/Ground/PTP-Ground_10-512x512.png",
+    "sha256": "dc2e499425fde3808b28d6e8d06e28cd62f144aabcb26b0b0f6173331eb4b997",
+    "license": "CC0",
+    "creator": "Screaming Brain Studios",
+    "diffuseLook": {
+      "center": [
+        123,
+        103,
+        79
+      ],
+      "contrast": 0.32,
+      "chroma": 0.18
+    }
+  },
+  "sand": {
+    "source": "pack3/512x512/Ground/PTP-Ground_01-512x512.png",
+    "sha256": "0d8a9e6a6f2405eceb522cba7c6a415a9662d997d48bf3dc3e58ebf871ac19a4",
+    "license": "CC0",
+    "creator": "Screaming Brain Studios",
+    "diffuseLook": {
+      "center": [
+        189,
+        177,
+        148
+      ],
+      "contrast": 0.28,
+      "chroma": 0.12
+    }
+  },
+  "gravel": {
+    "source": "pack1/512x512/Stone/Photoreal_Stone_01-512x512.png",
+    "sha256": "72df3adb9ef73c77cc78b5e621ce3294fc8922ab2641926929927e3f088c8f29",
+    "license": "CC0",
+    "creator": "Screaming Brain Studios",
+    "diffuseLook": {
+      "center": [
+        135,
+        131,
+        120
+      ],
+      "contrast": 0.35,
+      "chroma": 0.2
+    }
+  },
+  "clay": {
+    "source": "pack3/512x512/Ground/PTP-Ground_08-512x512.png",
+    "sha256": "4153876fce845f1c55cc07fffa099e9c4e49df46a08714eb3e992714f57eb12a",
+    "license": "CC0",
+    "creator": "Screaming Brain Studios",
+    "diffuseLook": {
+      "center": [
+        145,
+        126,
+        109
+      ],
+      "contrast": 0.3,
+      "chroma": 0.2
+    }
+  },
+  "log_side": {
+    "source": "pack1/512x512/Trees/Photoreal_Trees_08-512x512.png",
+    "sha256": "5639326ca878f4d8af49482fc293bca5043af9a39d2e355aad0fac0e638e7987",
+    "license": "CC0",
+    "creator": "Screaming Brain Studios",
+    "diffuseLook": {
+      "center": [
+        113,
+        107,
+        92
+      ],
+      "contrast": 0.36,
+      "chroma": 0.2
+    }
+  },
+  "pine_side": {
+    "source": "pack1/512x512/Trees/Photoreal_Trees_07-512x512.png",
+    "sha256": "152a8a1d2cd68aadead207c25214e309ede4098030c0bd4b07d113ac735b130c",
+    "license": "CC0",
+    "creator": "Screaming Brain Studios",
+    "diffuseLook": {
+      "center": [
+        121,
+        109,
+        92
+      ],
+      "contrast": 0.36,
+      "chroma": 0.2
+    }
+  },
+  "planks": {
+    "source": "pack1/512x512/Wood/Photoreal_Wood_04-512x512.png",
+    "sha256": "ba6e6c4ecdf84644a623d0892de03580ce6460e018ae85ed87cbf23debb389eb",
+    "license": "CC0",
+    "creator": "Screaming Brain Studios",
+    "diffuseLook": {
+      "center": [
+        149,
+        128,
+        96
+      ],
+      "contrast": 0.34,
+      "chroma": 0.25
+    }
+  },
+  "pine_planks": {
+    "source": "pack1/512x512/Wood/Photoreal_Wood_08-512x512.png",
+    "sha256": "f6dc8efe220d851a3d46136d5ed13131b23b896f7ca275f812b981a68766c8f0",
+    "license": "CC0",
+    "creator": "Screaming Brain Studios",
+    "diffuseLook": {
+      "center": [
+        157,
+        137,
+        101
+      ],
+      "contrast": 0.34,
+      "chroma": 0.25
+    }
+  },
+  "concrete": {
+    "source": "pack3/512x512/Concrete/PTP-Concrete_01-512x512.png",
+    "sha256": "28d5937ef426e1a45dc9f3160399b17b83cabf7293616ce54db71a1fb7a300f1",
+    "license": "CC0",
+    "creator": "Screaming Brain Studios",
+    "diffuseLook": {
+      "center": [
+        155,
+        154,
+        148
+      ],
+      "contrast": 0.3,
+      "chroma": 0.12
+    }
+  },
+  "sandstone": {
+    "source": "pack3/512x512/Stone/PTP-Stone_10-512x512.png",
+    "sha256": "c52577461f5b32d97163cadf70a6c8c01b8ee024035f9b11d18417ae3a6e5051",
+    "license": "CC0",
+    "creator": "Screaming Brain Studios",
+    "diffuseLook": {
+      "center": [
+        165,
+        147,
+        115
+      ],
+      "contrast": 0.32,
+      "chroma": 0.18
+    }
+  },
+  "basalt": {
+    "source": "pack3/512x512/Stone/PTP-Stone_01-512x512.png",
+    "sha256": "9e0069754cafe8393729ade3c75229aadd167e59154c71354a3952fb6fc5b9e1",
+    "license": "CC0",
+    "creator": "Screaming Brain Studios",
+    "diffuseLook": {
+      "center": [
+        101,
+        105,
+        106
+      ],
+      "contrast": 0.3,
+      "chroma": 0.12
+    }
+  },
+  "grass_top": {
+    "source": "pack1/512x512/Grass/Photoreal_Grass_06-512x512.png",
+    "sha256": "9083e2be1196aa2ff69f5cf13a06f600d0a2cf4ed60dc2953f2e586a32ef4d05",
+    "license": "CC0",
+    "creator": "Screaming Brain Studios",
+    "diffuseLook": {
+      "center": [
+        172,
+        178,
+        170
+      ],
+      "contrast": 0.27,
+      "chroma": 0
+    }
+  },
+  "grass_side": {
+    "source": "original procedural illustration",
+    "creator": "Lavra, code assisted",
+    "license": "original"
+  },
+  "leaves": {
+    "source": "original procedural illustration",
+    "creator": "Lavra, code assisted",
+    "license": "original"
+  },
+  "pine_leaves": {
+    "source": "original procedural illustration",
+    "creator": "Lavra, code assisted",
+    "license": "original"
+  },
+  "tall_grass": {
+    "source": "original procedural illustration",
+    "creator": "Lavra, code assisted",
+    "license": "original"
+  },
+  "flower_white": {
+    "source": "original procedural illustration",
+    "creator": "Lavra, code assisted",
+    "license": "original"
+  },
+  "flower_yellow": {
+    "source": "original procedural illustration",
+    "creator": "Lavra, code assisted",
+    "license": "original"
+  },
+  "flower_red": {
+    "source": "original procedural illustration",
+    "creator": "Lavra, code assisted",
+    "license": "original"
+  },
+  "flower_blue": {
+    "source": "original procedural illustration",
+    "creator": "Lavra, code assisted",
+    "license": "original"
+  }
+}

@@ -1,0 +1,9 @@
+// LAVRA — escala real e apoio no chão de cada modelo de bicho. GERADO por tools/fauna/escala.mjs a partir das
+// medidas dos modelos (tools/fauna/medidas.json, tiradas em /lab/fauna-fila.html) e das medidas reais de cada espécie.
+// Não editar à mão: mudar a medida real no gerador e rodar de novo.
+//   ESCALA_FAUNA[id]  fator aplicado ao modelo (1 = como veio do pacote; ausente = 1)
+//   CHAO_FAUNA[id]    quanto subir (+) ou descer (−) o modelo, em metros já na escala, para os pés tocarem o chão
+export const ESCALA_FAUNA = { alce: 1.36, anta: 0.81, besouro: 0.91, caranguejo: 0.45, caribu: 0.84, castor: 4.02, casuar: 1.84, cervo: 0.87, cisne: 1.6, coelho: 1.17, corvo: 1.14, crocodilo: 1.18, elefante: 1.43, esquilo: 1.39, foca: 1.12, formiga: 0.33, gado: 1.07, gaivota: 1.53, galinha: 0.83, gato: 1.31, gerbo: 0.7, girafa: 1.39, gnu: 0.85, golfinho: 1.11, gorila: 1.09, gralha: 0.87, grou: 1.24, harpia: 1.45, hipopotamo: 0.92, iguana: 1.09, impala: 1.17, komodo: 1.1, lagartixa: 0.73, lagartixa_crista: 0.7, leao: 0.67, leoa: 0.63, orca2: 0.8, peixe_arowana: 2.08, peixe_ayu: 0.92, peixe_betta: 0.56, peixe_blackrockfish: 1.14, peixe_goldfish: 1.08, peixe_greatwhiteshark: 0.92, peixe_horsemackerel: 1.28, peixe_koi: 0.75, peixe_mahimahi: 0.72, peixe_pirarucu: 0.9, peixe_salmon: 0.89, peixe_tuna: 1.04, pinguim: 1.08, porco: 1.62, rinoceronte: 0.85, sapo: 0.86, secretario: 1.39, tamandua: 1.5, tarantula: 0.73, tart_boxturtle: 0.87, tart_gianttortoise: 0.8, tart_seaturtle: 1.29, tart_snappingturtle: 0.79, tart_tortoise: 1.12, tordo: 1.26, urso: 0.84, vespa: 0.5, zebra: 1.04 };
+export const CHAO_FAUNA = { camelo: -0.018, caranguejo: 0.066, casuar: -0.138, crocodilo: 0.022, dromedario: -0.018, foca: 0.204, gnu: -0.014, gorila: 0.102, komodo: 0.046, tarantula: -0.012, tart_gianttortoise: -0.058, tart_tortoise: -0.034 };
+export const escalaDe = (id) => ESCALA_FAUNA[id] || 1;
+export const chaoDe = (id) => CHAO_FAUNA[id] || 0;

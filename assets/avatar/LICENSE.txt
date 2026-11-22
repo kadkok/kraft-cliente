@@ -1,0 +1,15 @@
+Diesel / 3D Character Rigged
+Original creator: THEUNSEENVULGA
+Source: https://theunseenvulga.itch.io/3d-charater-riggeddiesel
+License declared by creator: CC0 (public domain dedication).
+Creator expressly permits personal/commercial use, modification and use without attribution.
+License reference: https://creativecommons.org/publicdomain/zero/1.0/
+
+Original free GLB, upload 19450576, retrieved 2026-11-14.
+Original SHA-256: 9fbb438e8221f96e1f25da90c731f474bf031970a75ba132c87e1aeaf784745e
+The original remains preserved outside the game in the local quarantine.
+
+Lavra adaptation: hidden-body removal, eyebrow selection, reduced geometry,
+512px albedo textures, canonical scale/orientation, six control bones preserving
+the existing buildBody animation API. No authorship of the original is claimed.
+Reproduction: tools/prepare-avatar.py and preparation.json.

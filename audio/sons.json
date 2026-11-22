@@ -1,0 +1,989 @@
+{
+ "open": [
+  "abrir-1.ogg",
+  "abrir-2.ogg"
+ ],
+ "ambiente.agua": [
+  "ambiente.agua-1.ogg",
+  "ambiente.agua-2.ogg",
+  "ambiente.agua-3.ogg",
+  "ambiente.agua-4.ogg",
+  "ambiente.agua-5.ogg"
+ ],
+ "ambiente.arqueda": [
+  "ambiente.arqueda-1.ogg",
+  "ambiente.arqueda-2.ogg"
+ ],
+ "ambiente.baleia": [
+  "mar.whale_blow.ogg",
+  "ambiente.baleia-1.ogg",
+  "ambiente.baleia-2.ogg",
+  "ambiente.baleia-3.ogg"
+ ],
+ "ambiente.barco": [
+  "mar.boat_engine.ogg",
+  "ambiente.barco-1.ogg"
+ ],
+ "ambiente.bolha": [
+  "ambiente.bolha-1.ogg",
+  "ambiente.bolha-2.ogg"
+ ],
+ "ambiente.cachoeira": [
+  "ambiente.cachoeira-1.ogg",
+  "ambiente.cachoeira-2.ogg",
+  "ambiente.cachoeira-3.ogg"
+ ],
+ "ambiente.carro": [
+  "ambiente.carro-1.ogg",
+  "ambiente.carro-2.ogg"
+ ],
+ "ambiente.chuva": [
+  "ambiente.chuva-1.ogg",
+  "ambiente.chuva-2.ogg"
+ ],
+ "ambiente.cigarras": [
+  "ambiente.cigarras-1.ogg"
+ ],
+ "ambiente.coruja": [
+  "ambiente.coruja-1.ogg",
+  "ambiente.coruja-2.ogg",
+  "ambiente.coruja-3.ogg",
+  "ambiente.coruja-4.ogg"
+ ],
+ "ambiente.corvo": [
+  "ambiente.corvo-1.ogg",
+  "ambiente.corvo-2.ogg",
+  "ambiente.corvo-3.ogg"
+ ],
+ "ambiente.fogo": [
+  "ambiente.fogo-1.ogg",
+  "ambiente.fogo-2.ogg"
+ ],
+ "ambiente.fundo": [
+  "ambiente.fundo-1.ogg",
+  "ambiente.fundo-2.ogg",
+  "ambiente.fundo-3.ogg"
+ ],
+ "ambiente.gaivota": [
+  "mar.gull.ogg",
+  "ambiente.gaivota-1.ogg",
+  "ambiente.gaivota-2.ogg"
+ ],
+ "ambiente.galope": [
+  "ambiente.galope-1.ogg"
+ ],
+ "ambiente.gota": [
+  "ambiente.gota-1.ogg",
+  "ambiente.gota-2.ogg",
+  "ambiente.gota-3.ogg",
+  "ambiente.gota-4.ogg"
+ ],
+ "ambiente.grilos": [
+  "ambiente.grilos-1.ogg",
+  "ambiente.grilos-2.ogg"
+ ],
+ "ambiente.helice": [
+  "ambiente.helice-1.ogg",
+  "ambiente.helice-2.ogg"
+ ],
+ "ambiente.lobo": [
+  "ambiente.lobo-1.ogg",
+  "ambiente.lobo-2.ogg",
+  "ambiente.lobo-3.ogg"
+ ],
+ "ambiente.mata": [
+  "ambiente.mata-2.ogg",
+  "ambiente.mata.ogg"
+ ],
+ "ambiente.motor": [
+  "ambiente.motor.ogg"
+ ],
+ "ambiente.passaros": [
+  "ambiente.passaros-1.ogg",
+  "ambiente.passaros-2.ogg"
+ ],
+ "ambiente.portal": [
+  "ambiente.portal-1.ogg"
+ ],
+ "ambiente.queimador": [
+  "ambiente.queimador-1.ogg"
+ ],
+ "ambiente.sapo": [
+  "ambiente.sapo-1.ogg",
+  "ambiente.sapo-2.ogg",
+  "ambiente.sapo-3.ogg"
+ ],
+ "ambiente.submerso": [
+  "mar.under_reef.ogg",
+  "ambiente.submerso-1.ogg",
+  "ambiente.submerso-2.ogg",
+  "ambiente.submerso-3.ogg",
+  "ambiente.submerso-4.ogg"
+ ],
+ "ambiente.vento": [
+  "ambiente.vento-1.ogg",
+  "ambiente.vento-2.ogg",
+  "ambiente.vento-3.ogg",
+  "ambiente.vento-4.ogg",
+  "ambiente.vento-5.ogg",
+  "ambiente.vento-6.ogg",
+  "ambiente.vento-7.ogg",
+  "ambiente.vento_forte-1.ogg"
+ ],
+ "ambiente.zumbido": [
+  "ambiente.zumbido-1.ogg",
+  "ambiente.zumbido-2.ogg",
+  "ambiente.zumbido-3.ogg"
+ ],
+ "bubble": [
+  "bolha-1.ogg",
+  "bolha-2.ogg",
+  "bolha-3.ogg",
+  "bolha-4.ogg",
+  "bolha-5.ogg",
+  "bolha-6.ogg",
+  "bolha-7.ogg",
+  "bolha-8.ogg"
+ ],
+ "tick": [
+  "clique-1.ogg",
+  "clique-2.ogg",
+  "clique-3.ogg"
+ ],
+ "place.sand": [
+  "colocar.areia-1.ogg",
+  "colocar.areia-2.ogg",
+  "colocar.areia-3.ogg",
+  "colocar.areia-4.ogg",
+  "colocar.areia-5.ogg"
+ ],
+ "place.gravel": [
+  "colocar.cascalho-1.ogg",
+  "colocar.cascalho-2.ogg",
+  "colocar.cascalho-3.ogg",
+  "colocar.cascalho-4.ogg",
+  "colocar.cascalho-5.ogg"
+ ],
+ "place.leaves": [
+  "colocar.folhas-1.ogg",
+  "colocar.folhas-2.ogg",
+  "colocar.folhas-3.ogg",
+  "colocar.folhas-4.ogg",
+  "colocar.folhas-5.ogg"
+ ],
+ "place.grass": [
+  "colocar.grama-1.ogg",
+  "colocar.grama-2.ogg",
+  "colocar.grama-3.ogg",
+  "colocar.grama-4.ogg",
+  "colocar.grama-5.ogg"
+ ],
+ "place.wood": [
+  "colocar.madeira-1.ogg",
+  "colocar.madeira-2.ogg",
+  "colocar.madeira-3.ogg",
+  "colocar.madeira-4.ogg",
+  "colocar.madeira-5.ogg"
+ ],
+ "place.metal": [
+  "colocar.metal-1.ogg",
+  "colocar.metal-2.ogg",
+  "colocar.metal-3.ogg",
+  "colocar.metal-4.ogg",
+  "colocar.metal-5.ogg"
+ ],
+ "place.snow": [
+  "colocar.neve-1.ogg",
+  "colocar.neve-2.ogg",
+  "colocar.neve-3.ogg",
+  "colocar.neve-4.ogg",
+  "colocar.neve-5.ogg"
+ ],
+ "place.stone": [
+  "colocar.pedra-1.ogg",
+  "colocar.pedra-2.ogg",
+  "colocar.pedra-3.ogg",
+  "colocar.pedra-4.ogg",
+  "colocar.pedra-5.ogg"
+ ],
+ "place.plant": [
+  "colocar.planta-1.ogg",
+  "colocar.planta-2.ogg",
+  "colocar.planta-3.ogg",
+  "colocar.planta-4.ogg",
+  "colocar.planta-5.ogg"
+ ],
+ "place.dirt": [
+  "colocar.terra-1.ogg",
+  "colocar.terra-2.ogg",
+  "colocar.terra-3.ogg",
+  "colocar.terra-4.ogg",
+  "colocar.terra-5.ogg"
+ ],
+ "place.glass": [
+  "colocar.vidro-1.ogg",
+  "colocar.vidro-2.ogg",
+  "colocar.vidro-3.ogg",
+  "colocar.vidro-4.ogg",
+  "colocar.vidro-5.ogg"
+ ],
+ "hurt": [
+  "dor-1.ogg",
+  "dor-2.ogg",
+  "dor-3.ogg"
+ ],
+ "hurt.armadura": [
+  "dor.armadura-1.ogg",
+  "dor.armadura-2.ogg",
+  "dor.armadura-3.ogg"
+ ],
+ "hurt.colosso": [
+  "dor.colosso-1.ogg",
+  "dor.colosso-2.ogg",
+  "dor.colosso-3.ogg"
+ ],
+ "hurt.dentefera": [
+  "dor.dentefera-1.ogg",
+  "dor.dentefera-2.ogg",
+  "dor.dentefera-3.ogg"
+ ],
+ "hurt.devorador": [
+  "dor.devorador-1.ogg",
+  "dor.devorador-2.ogg"
+ ],
+ "hurt.vigia": [
+  "dor.vigia-1.ogg",
+  "dor.vigia-2.ogg",
+  "dor.vigia-3.ogg"
+ ],
+ "dig.wood": [
+  "escavar.madeira-1.ogg",
+  "escavar.madeira-2.ogg",
+  "escavar.madeira-3.ogg",
+  "escavar.madeira-4.ogg",
+  "escavar.madeira-5.ogg"
+ ],
+ "exhale": [
+  "esforco-1.ogg",
+  "esforco-2.ogg",
+  "esforco-3.ogg",
+  "esforco-4.ogg",
+  "esforco-5.ogg",
+  "esforco-6.ogg"
+ ],
+ "boom": [
+  "explosao-1.ogg",
+  "explosao-2.ogg",
+  "explosao-3.ogg"
+ ],
+ "close": [
+  "fechar-1.ogg",
+  "fechar-2.ogg"
+ ],
+ "gasp": [
+  "folego-1.ogg",
+  "folego-2.ogg",
+  "folego-3.ogg",
+  "folego-4.ogg",
+  "folego-5.ogg",
+  "folego-6.ogg",
+  "folego-7.ogg",
+  "folego-8.ogg"
+ ],
+ "hit": [
+  "golpe-1.ogg",
+  "golpe-2.ogg",
+  "golpe-3.ogg",
+  "golpe-4.ogg",
+  "golpe-5.ogg"
+ ],
+ "splash": [
+  "mar.splash.ogg",
+  "mergulho-1.ogg",
+  "mergulho-10.ogg",
+  "mergulho-11.ogg",
+  "mergulho-12.ogg",
+  "mergulho-2.ogg",
+  "mergulho-3.ogg",
+  "mergulho-4.ogg",
+  "mergulho-5.ogg",
+  "mergulho-6.ogg",
+  "mergulho-7.ogg",
+  "mergulho-8.ogg",
+  "mergulho-9.ogg"
+ ],
+ "musica.dia": [
+  "musica.dia-1.ogg",
+  "musica.dia-2.ogg"
+ ],
+ "musica.noite": [
+  "musica.noite-1.ogg",
+  "musica.noite-2.ogg"
+ ],
+ "musica.zona": [
+  "musica.zona-1.ogg"
+ ],
+ "swim": [
+  "mar.swim.ogg",
+  "nado-1.ogg",
+  "nado-10.ogg",
+  "nado-2.ogg",
+  "nado-3.ogg",
+  "nado-4.ogg",
+  "nado-5.ogg",
+  "nado-6.ogg",
+  "nado-7.ogg",
+  "nado-8.ogg",
+  "nado-9.ogg"
+ ],
+ "step.water": [
+  "mar.step_water.ogg",
+  "passo.agua-1.ogg",
+  "passo.agua-10.ogg",
+  "passo.agua-11.ogg",
+  "passo.agua-12.ogg",
+  "passo.agua-2.ogg",
+  "passo.agua-3.ogg",
+  "passo.agua-4.ogg",
+  "passo.agua-5.ogg",
+  "passo.agua-6.ogg",
+  "passo.agua-7.ogg",
+  "passo.agua-8.ogg",
+  "passo.agua-9.ogg"
+ ],
+ "step.sand": [
+  "mar.step_sand.ogg",
+  "passo.areia-1.ogg",
+  "passo.areia-10.ogg",
+  "passo.areia-11.ogg",
+  "passo.areia-12.ogg",
+  "passo.areia-13.ogg",
+  "passo.areia-14.ogg",
+  "passo.areia-15.ogg",
+  "passo.areia-16.ogg",
+  "passo.areia-17.ogg",
+  "passo.areia-18.ogg",
+  "passo.areia-19.ogg",
+  "passo.areia-2.ogg",
+  "passo.areia-20.ogg",
+  "passo.areia-21.ogg",
+  "passo.areia-22.ogg",
+  "passo.areia-23.ogg",
+  "passo.areia-24.ogg",
+  "passo.areia-25.ogg",
+  "passo.areia-26.ogg",
+  "passo.areia-27.ogg",
+  "passo.areia-28.ogg",
+  "passo.areia-29.ogg",
+  "passo.areia-3.ogg",
+  "passo.areia-30.ogg",
+  "passo.areia-31.ogg",
+  "passo.areia-32.ogg",
+  "passo.areia-4.ogg",
+  "passo.areia-5.ogg",
+  "passo.areia-6.ogg",
+  "passo.areia-7.ogg",
+  "passo.areia-8.ogg",
+  "passo.areia-9.ogg"
+ ],
+ "step.gravel": [
+  "passo.cascalho-1.ogg",
+  "passo.cascalho-10.ogg",
+  "passo.cascalho-11.ogg",
+  "passo.cascalho-12.ogg",
+  "passo.cascalho-13.ogg",
+  "passo.cascalho-14.ogg",
+  "passo.cascalho-15.ogg",
+  "passo.cascalho-16.ogg",
+  "passo.cascalho-17.ogg",
+  "passo.cascalho-18.ogg",
+  "passo.cascalho-19.ogg",
+  "passo.cascalho-2.ogg",
+  "passo.cascalho-20.ogg",
+  "passo.cascalho-21.ogg",
+  "passo.cascalho-22.ogg",
+  "passo.cascalho-23.ogg",
+  "passo.cascalho-24.ogg",
+  "passo.cascalho-25.ogg",
+  "passo.cascalho-26.ogg",
+  "passo.cascalho-27.ogg",
+  "passo.cascalho-28.ogg",
+  "passo.cascalho-29.ogg",
+  "passo.cascalho-3.ogg",
+  "passo.cascalho-30.ogg",
+  "passo.cascalho-31.ogg",
+  "passo.cascalho-32.ogg",
+  "passo.cascalho-4.ogg",
+  "passo.cascalho-5.ogg",
+  "passo.cascalho-6.ogg",
+  "passo.cascalho-7.ogg",
+  "passo.cascalho-8.ogg",
+  "passo.cascalho-9.ogg"
+ ],
+ "step.leaves": [
+  "passo.folhas-1.ogg",
+  "passo.folhas-10.ogg",
+  "passo.folhas-11.ogg",
+  "passo.folhas-12.ogg",
+  "passo.folhas-13.ogg",
+  "passo.folhas-14.ogg",
+  "passo.folhas-15.ogg",
+  "passo.folhas-16.ogg",
+  "passo.folhas-17.ogg",
+  "passo.folhas-18.ogg",
+  "passo.folhas-19.ogg",
+  "passo.folhas-2.ogg",
+  "passo.folhas-20.ogg",
+  "passo.folhas-21.ogg",
+  "passo.folhas-22.ogg",
+  "passo.folhas-23.ogg",
+  "passo.folhas-24.ogg",
+  "passo.folhas-3.ogg",
+  "passo.folhas-4.ogg",
+  "passo.folhas-5.ogg",
+  "passo.folhas-6.ogg",
+  "passo.folhas-7.ogg",
+  "passo.folhas-8.ogg",
+  "passo.folhas-9.ogg"
+ ],
+ "step.grass": [
+  "passo.grama-1.ogg",
+  "passo.grama-10.ogg",
+  "passo.grama-11.ogg",
+  "passo.grama-12.ogg",
+  "passo.grama-13.ogg",
+  "passo.grama-14.ogg",
+  "passo.grama-15.ogg",
+  "passo.grama-16.ogg",
+  "passo.grama-17.ogg",
+  "passo.grama-18.ogg",
+  "passo.grama-19.ogg",
+  "passo.grama-2.ogg",
+  "passo.grama-20.ogg",
+  "passo.grama-21.ogg",
+  "passo.grama-22.ogg",
+  "passo.grama-23.ogg",
+  "passo.grama-24.ogg",
+  "passo.grama-25.ogg",
+  "passo.grama-26.ogg",
+  "passo.grama-27.ogg",
+  "passo.grama-28.ogg",
+  "passo.grama-29.ogg",
+  "passo.grama-3.ogg",
+  "passo.grama-30.ogg",
+  "passo.grama-31.ogg",
+  "passo.grama-32.ogg",
+  "passo.grama-4.ogg",
+  "passo.grama-5.ogg",
+  "passo.grama-6.ogg",
+  "passo.grama-7.ogg",
+  "passo.grama-8.ogg",
+  "passo.grama-9.ogg"
+ ],
+ "step.wood": [
+  "mar.step_wood.ogg",
+  "passo.madeira-1.ogg",
+  "passo.madeira-10.ogg",
+  "passo.madeira-11.ogg",
+  "passo.madeira-12.ogg",
+  "passo.madeira-13.ogg",
+  "passo.madeira-14.ogg",
+  "passo.madeira-15.ogg",
+  "passo.madeira-16.ogg",
+  "passo.madeira-17.ogg",
+  "passo.madeira-18.ogg",
+  "passo.madeira-19.ogg",
+  "passo.madeira-2.ogg",
+  "passo.madeira-20.ogg",
+  "passo.madeira-21.ogg",
+  "passo.madeira-22.ogg",
+  "passo.madeira-23.ogg",
+  "passo.madeira-24.ogg",
+  "passo.madeira-25.ogg",
+  "passo.madeira-26.ogg",
+  "passo.madeira-27.ogg",
+  "passo.madeira-28.ogg",
+  "passo.madeira-29.ogg",
+  "passo.madeira-3.ogg",
+  "passo.madeira-30.ogg",
+  "passo.madeira-31.ogg",
+  "passo.madeira-32.ogg",
+  "passo.madeira-4.ogg",
+  "passo.madeira-5.ogg",
+  "passo.madeira-6.ogg",
+  "passo.madeira-7.ogg",
+  "passo.madeira-8.ogg",
+  "passo.madeira-9.ogg"
+ ],
+ "step.metal": [
+  "passo.metal-1.ogg",
+  "passo.metal-10.ogg",
+  "passo.metal-11.ogg",
+  "passo.metal-12.ogg",
+  "passo.metal-13.ogg",
+  "passo.metal-14.ogg",
+  "passo.metal-15.ogg",
+  "passo.metal-16.ogg",
+  "passo.metal-17.ogg",
+  "passo.metal-18.ogg",
+  "passo.metal-19.ogg",
+  "passo.metal-2.ogg",
+  "passo.metal-20.ogg",
+  "passo.metal-21.ogg",
+  "passo.metal-22.ogg",
+  "passo.metal-23.ogg",
+  "passo.metal-24.ogg",
+  "passo.metal-25.ogg",
+  "passo.metal-26.ogg",
+  "passo.metal-27.ogg",
+  "passo.metal-28.ogg",
+  "passo.metal-29.ogg",
+  "passo.metal-3.ogg",
+  "passo.metal-30.ogg",
+  "passo.metal-31.ogg",
+  "passo.metal-32.ogg",
+  "passo.metal-4.ogg",
+  "passo.metal-5.ogg",
+  "passo.metal-6.ogg",
+  "passo.metal-7.ogg",
+  "passo.metal-8.ogg",
+  "passo.metal-9.ogg"
+ ],
+ "step.snow": [
+  "passo.neve-1.ogg",
+  "passo.neve-10.ogg",
+  "passo.neve-11.ogg",
+  "passo.neve-12.ogg",
+  "passo.neve-13.ogg",
+  "passo.neve-14.ogg",
+  "passo.neve-15.ogg",
+  "passo.neve-16.ogg",
+  "passo.neve-17.ogg",
+  "passo.neve-18.ogg",
+  "passo.neve-19.ogg",
+  "passo.neve-2.ogg",
+  "passo.neve-20.ogg",
+  "passo.neve-21.ogg",
+  "passo.neve-22.ogg",
+  "passo.neve-23.ogg",
+  "passo.neve-24.ogg",
+  "passo.neve-25.ogg",
+  "passo.neve-26.ogg",
+  "passo.neve-27.ogg",
+  "passo.neve-28.ogg",
+  "passo.neve-29.ogg",
+  "passo.neve-3.ogg",
+  "passo.neve-30.ogg",
+  "passo.neve-31.ogg",
+  "passo.neve-32.ogg",
+  "passo.neve-4.ogg",
+  "passo.neve-5.ogg",
+  "passo.neve-6.ogg",
+  "passo.neve-7.ogg",
+  "passo.neve-8.ogg",
+  "passo.neve-9.ogg"
+ ],
+ "step.stone": [
+  "passo.pedra-1.ogg",
+  "passo.pedra-10.ogg",
+  "passo.pedra-11.ogg",
+  "passo.pedra-12.ogg",
+  "passo.pedra-13.ogg",
+  "passo.pedra-14.ogg",
+  "passo.pedra-15.ogg",
+  "passo.pedra-16.ogg",
+  "passo.pedra-17.ogg",
+  "passo.pedra-18.ogg",
+  "passo.pedra-19.ogg",
+  "passo.pedra-2.ogg",
+  "passo.pedra-20.ogg",
+  "passo.pedra-21.ogg",
+  "passo.pedra-22.ogg",
+  "passo.pedra-23.ogg",
+  "passo.pedra-24.ogg",
+  "passo.pedra-25.ogg",
+  "passo.pedra-26.ogg",
+  "passo.pedra-27.ogg",
+  "passo.pedra-28.ogg",
+  "passo.pedra-29.ogg",
+  "passo.pedra-3.ogg",
+  "passo.pedra-30.ogg",
+  "passo.pedra-31.ogg",
+  "passo.pedra-32.ogg",
+  "passo.pedra-4.ogg",
+  "passo.pedra-5.ogg",
+  "passo.pedra-6.ogg",
+  "passo.pedra-7.ogg",
+  "passo.pedra-8.ogg",
+  "passo.pedra-9.ogg"
+ ],
+ "step.plant": [
+  "passo.planta-1.ogg",
+  "passo.planta-10.ogg",
+  "passo.planta-11.ogg",
+  "passo.planta-12.ogg",
+  "passo.planta-13.ogg",
+  "passo.planta-14.ogg",
+  "passo.planta-15.ogg",
+  "passo.planta-16.ogg",
+  "passo.planta-2.ogg",
+  "passo.planta-3.ogg",
+  "passo.planta-4.ogg",
+  "passo.planta-5.ogg",
+  "passo.planta-6.ogg",
+  "passo.planta-7.ogg",
+  "passo.planta-8.ogg",
+  "passo.planta-9.ogg"
+ ],
+ "step.dirt": [
+  "passo.terra-1.ogg",
+  "passo.terra-10.ogg",
+  "passo.terra-11.ogg",
+  "passo.terra-12.ogg",
+  "passo.terra-13.ogg",
+  "passo.terra-14.ogg",
+  "passo.terra-15.ogg",
+  "passo.terra-16.ogg",
+  "passo.terra-17.ogg",
+  "passo.terra-18.ogg",
+  "passo.terra-19.ogg",
+  "passo.terra-2.ogg",
+  "passo.terra-20.ogg",
+  "passo.terra-21.ogg",
+  "passo.terra-22.ogg",
+  "passo.terra-23.ogg",
+  "passo.terra-24.ogg",
+  "passo.terra-25.ogg",
+  "passo.terra-26.ogg",
+  "passo.terra-27.ogg",
+  "passo.terra-28.ogg",
+  "passo.terra-29.ogg",
+  "passo.terra-3.ogg",
+  "passo.terra-30.ogg",
+  "passo.terra-31.ogg",
+  "passo.terra-32.ogg",
+  "passo.terra-4.ogg",
+  "passo.terra-5.ogg",
+  "passo.terra-6.ogg",
+  "passo.terra-7.ogg",
+  "passo.terra-8.ogg",
+  "passo.terra-9.ogg"
+ ],
+ "step.glass": [
+  "passo.vidro-1.ogg",
+  "passo.vidro-10.ogg",
+  "passo.vidro-11.ogg",
+  "passo.vidro-12.ogg",
+  "passo.vidro-13.ogg",
+  "passo.vidro-14.ogg",
+  "passo.vidro-15.ogg",
+  "passo.vidro-16.ogg",
+  "passo.vidro-17.ogg",
+  "passo.vidro-18.ogg",
+  "passo.vidro-19.ogg",
+  "passo.vidro-2.ogg",
+  "passo.vidro-20.ogg",
+  "passo.vidro-21.ogg",
+  "passo.vidro-22.ogg",
+  "passo.vidro-23.ogg",
+  "passo.vidro-24.ogg",
+  "passo.vidro-3.ogg",
+  "passo.vidro-4.ogg",
+  "passo.vidro-5.ogg",
+  "passo.vidro-6.ogg",
+  "passo.vidro-7.ogg",
+  "passo.vidro-8.ogg",
+  "passo.vidro-9.ogg"
+ ],
+ "pegar": [
+  "pegar-1.ogg",
+  "pegar-2.ogg",
+  "pegar-3.ogg",
+  "pegar-4.ogg"
+ ],
+ "portal": [
+  "portal-1.ogg"
+ ],
+ "land": [
+  "pouso-1.ogg",
+  "pouso-10.ogg",
+  "pouso-11.ogg",
+  "pouso-12.ogg",
+  "pouso-13.ogg",
+  "pouso-14.ogg",
+  "pouso-15.ogg",
+  "pouso-16.ogg",
+  "pouso-2.ogg",
+  "pouso-3.ogg",
+  "pouso-4.ogg",
+  "pouso-5.ogg",
+  "pouso-6.ogg",
+  "pouso-7.ogg",
+  "pouso-8.ogg",
+  "pouso-9.ogg"
+ ],
+ "omen": [
+  "presenca-1.ogg"
+ ],
+ "break.sand": [
+  "quebrar.areia-1.ogg",
+  "quebrar.areia-2.ogg",
+  "quebrar.areia-3.ogg",
+  "quebrar.areia-4.ogg",
+  "quebrar.areia-5.ogg"
+ ],
+ "break.wood": [
+  "quebrar.arvore-1.ogg",
+  "quebrar.arvore-2.ogg",
+  "quebrar.madeira-1.ogg",
+  "quebrar.madeira-2.ogg",
+  "quebrar.madeira-3.ogg",
+  "quebrar.madeira-4.ogg",
+  "quebrar.madeira-5.ogg"
+ ],
+ "break.gravel": [
+  "quebrar.cascalho-1.ogg",
+  "quebrar.cascalho-2.ogg",
+  "quebrar.cascalho-3.ogg",
+  "quebrar.cascalho-4.ogg",
+  "quebrar.cascalho-5.ogg"
+ ],
+ "break.leaves": [
+  "quebrar.folhas-1.ogg",
+  "quebrar.folhas-2.ogg",
+  "quebrar.folhas-3.ogg",
+  "quebrar.folhas-4.ogg",
+  "quebrar.folhas-5.ogg"
+ ],
+ "break.grass": [
+  "quebrar.grama-1.ogg",
+  "quebrar.grama-2.ogg",
+  "quebrar.grama-3.ogg",
+  "quebrar.grama-4.ogg",
+  "quebrar.grama-5.ogg"
+ ],
+ "break.metal": [
+  "quebrar.metal-1.ogg",
+  "quebrar.metal-2.ogg",
+  "quebrar.metal-3.ogg",
+  "quebrar.metal-4.ogg",
+  "quebrar.metal-5.ogg"
+ ],
+ "break.snow": [
+  "quebrar.neve-1.ogg",
+  "quebrar.neve-2.ogg",
+  "quebrar.neve-3.ogg",
+  "quebrar.neve-4.ogg",
+  "quebrar.neve-5.ogg"
+ ],
+ "break.stone": [
+  "quebrar.pedra-1.ogg",
+  "quebrar.pedra-2.ogg",
+  "quebrar.pedra-3.ogg",
+  "quebrar.pedra-4.ogg",
+  "quebrar.pedra-5.ogg"
+ ],
+ "break.plant": [
+  "quebrar.planta-1.ogg",
+  "quebrar.planta-2.ogg",
+  "quebrar.planta-3.ogg",
+  "quebrar.planta-4.ogg",
+  "quebrar.planta-5.ogg"
+ ],
+ "break.dirt": [
+  "quebrar.terra-1.ogg",
+  "quebrar.terra-2.ogg",
+  "quebrar.terra-3.ogg",
+  "quebrar.terra-4.ogg",
+  "quebrar.terra-5.ogg"
+ ],
+ "break.glass": [
+  "quebrar.vidro-1.ogg",
+  "quebrar.vidro-2.ogg",
+  "quebrar.vidro-3.ogg",
+  "quebrar.vidro-4.ogg",
+  "quebrar.vidro-5.ogg"
+ ],
+ "fall": [
+  "queda-1.ogg",
+  "queda-2.ogg",
+  "queda-3.ogg",
+  "queda-4.ogg",
+  "queda-5.ogg",
+  "queda-6.ogg",
+  "queda-7.ogg",
+  "queda-8.ogg"
+ ],
+ "gust": [
+  "rajada-1.ogg",
+  "rajada-2.ogg",
+  "rajada-3.ogg",
+  "rajada-4.ogg",
+  "rajada-5.ogg",
+  "rajada-6.ogg",
+  "rajada-7.ogg",
+  "rajada-8.ogg"
+ ],
+ "breath": [
+  "respirar-1.ogg",
+  "respirar-10.ogg",
+  "respirar-2.ogg",
+  "respirar-3.ogg",
+  "respirar-4.ogg",
+  "respirar-5.ogg",
+  "respirar-6.ogg",
+  "respirar-7.ogg",
+  "respirar-8.ogg",
+  "respirar-9.ogg"
+ ],
+ "growl.armadura": [
+  "rosnado.armadura-1.ogg",
+  "rosnado.armadura-2.ogg",
+  "rosnado.armadura-3.ogg"
+ ],
+ "growl.colosso": [
+  "rosnado.colosso-1.ogg",
+  "rosnado.colosso-2.ogg",
+  "rosnado.colosso-3.ogg",
+  "rosnado.colosso-4.ogg",
+  "rosnado.colosso-5.ogg"
+ ],
+ "growl.dentefera": [
+  "rosnado.dentefera-1.ogg",
+  "rosnado.dentefera-2.ogg",
+  "rosnado.dentefera-3.ogg"
+ ],
+ "growl.devorador": [
+  "rosnado.devorador-1.ogg",
+  "rosnado.devorador-2.ogg",
+  "rosnado.devorador-3.ogg"
+ ],
+ "growl.vigia": [
+  "rosnado.vigia-1.ogg",
+  "rosnado.vigia-2.ogg",
+  "rosnado.vigia-3.ogg"
+ ],
+ "water-exit": [
+  "mar.emerge.ogg",
+  "sair-1.ogg",
+  "sair-10.ogg",
+  "sair-2.ogg",
+  "sair-3.ogg",
+  "sair-4.ogg",
+  "sair-5.ogg",
+  "sair-6.ogg",
+  "sair-7.ogg",
+  "sair-8.ogg",
+  "sair-9.ogg"
+ ],
+ "jump": [
+  "salto-1.ogg",
+  "salto-10.ogg",
+  "salto-2.ogg",
+  "salto-3.ogg",
+  "salto-4.ogg",
+  "salto-5.ogg",
+  "salto-6.ogg",
+  "salto-7.ogg",
+  "salto-8.ogg",
+  "salto-9.ogg"
+ ],
+ "whisper": [
+  "sussurro-1.ogg",
+  "sussurro-2.ogg"
+ ],
+ "shot": [
+  "tiro-1.ogg",
+  "tiro-2.ogg"
+ ],
+ "thunder": [
+  "trovao-1.ogg",
+  "trovao-2.ogg",
+  "trovao-3.ogg"
+ ],
+ "ambiente.surf_far": [
+  "mar.surf_far.ogg"
+ ],
+ "ambiente.wind": [
+  "mar.wind.ogg"
+ ],
+ "ambiente.palms": [
+  "mar.palms.ogg"
+ ],
+ "ambiente.pier_lap": [
+  "mar.pier_lap.ogg"
+ ],
+ "ambiente.under_reef": [
+  "mar.under_reef.ogg"
+ ],
+ "ambiente.whale_song": [
+  "mar.whale_song.ogg"
+ ],
+ "ambiente.boat_engine": [
+  "mar.boat_engine.ogg"
+ ],
+ "ambiente.boat_lap": [
+  "mar.boat_lap.ogg"
+ ],
+ "ambiente.boat_rush": [
+  "mar.boat_rush.ogg"
+ ],
+ "surf_crash": [
+  "mar.surf_crash.ogg"
+ ],
+ "surf_wash": [
+  "mar.surf_wash.ogg"
+ ],
+ "surf_backwash": [
+  "mar.surf_backwash.ogg"
+ ],
+ "submerge": [
+  "mar.submerge.ogg"
+ ],
+ "emerge": [
+  "mar.emerge.ogg"
+ ],
+ "uw_swim": [
+  "mar.uw_swim.ogg"
+ ],
+ "big_splash": [
+  "mar.big_splash.ogg"
+ ],
+ "step_sand": [
+  "mar.step_sand.ogg"
+ ],
+ "step_wetsand": [
+  "mar.step_wetsand.ogg"
+ ],
+ "step_water": [
+  "mar.step_water.ogg"
+ ],
+ "step_wood": [
+  "mar.step_wood.ogg"
+ ],
+ "step.wetsand": [
+  "mar.step_wetsand.ogg"
+ ],
+ "gull": [
+  "mar.gull.ogg"
+ ],
+ "tern": [
+  "mar.tern.ogg"
+ ],
+ "whale_blow": [
+  "mar.whale_blow.ogg"
+ ],
+ "hull_slap": [
+  "mar.hull_slap.ogg"
+ ],
+ "water-enter": [
+  "mar.submerge.ogg",
+  "mar.splash.ogg"
+ ],
+ "mar.swim": [
+  "mar.swim.ogg"
+ ],
+ "mar.splash": [
+  "mar.splash.ogg"
+ ]
+}

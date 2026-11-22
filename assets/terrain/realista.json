@@ -1,0 +1,242 @@
+{
+ "gerado_por": "tools/pacote-realista.py",
+ "licenca": "pendente (uso privado; licença é de quem lança)",
+ "verde_invertido": true,
+ "texturas": {
+  "bedrock": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/bedrock.png",
+   "size": 128,
+   "pbr": true
+  },
+  "stone": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/stone.png",
+   "size": 128,
+   "pbr": true
+  },
+  "dirt": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/dirt.png",
+   "size": 128,
+   "pbr": true
+  },
+  "sand": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/sand.png",
+   "size": 128,
+   "pbr": true
+  },
+  "gravel": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/gravel.png",
+   "size": 128,
+   "pbr": true
+  },
+  "clay": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/clay.png",
+   "size": 128,
+   "pbr": true
+  },
+  "snow": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/snow.png",
+   "size": 128,
+   "pbr": true
+  },
+  "ice": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/packed_ice.png",
+   "size": 128,
+   "pbr": true
+  },
+  "log_side": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/oak_log.png",
+   "size": 128,
+   "pbr": true
+  },
+  "log_top": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/oak_log_top.png",
+   "size": 128,
+   "pbr": true
+  },
+  "pine_side": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/spruce_log.png",
+   "size": 128,
+   "pbr": true
+  },
+  "pine_top": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/spruce_log_top.png",
+   "size": 128,
+   "pbr": true
+  },
+  "planks": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/oak_planks.png",
+   "size": 128,
+   "pbr": true
+  },
+  "pine_planks": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/spruce_planks.png",
+   "size": 128,
+   "pbr": true
+  },
+  "stone_bricks": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/stone_bricks.png",
+   "size": 128,
+   "pbr": true
+  },
+  "bricks": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/bricks.png",
+   "size": 128,
+   "pbr": true
+  },
+  "coal_ore": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/coal_ore.png",
+   "size": 128,
+   "pbr": true
+  },
+  "iron_ore": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/iron_ore.png",
+   "size": 128,
+   "pbr": true
+  },
+  "copper_ore": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/copper_ore.png",
+   "size": 128,
+   "pbr": true
+  },
+  "gold_ore": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/gold_ore.png",
+   "size": 128,
+   "pbr": true
+  },
+  "crystal_ore": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/diamond_ore.png",
+   "size": 128,
+   "pbr": true
+  },
+  "sandstone": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/sandstone.png",
+   "size": 128,
+   "pbr": true
+  },
+  "basalt": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/basalt_side.png",
+   "size": 128,
+   "pbr": true
+  },
+  "marble": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/quartz_block_side.png",
+   "size": 128,
+   "pbr": true
+  },
+  "concrete": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/light_gray_concrete.png",
+   "size": 128,
+   "pbr": true
+  },
+  "steel": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/iron_block.png",
+   "size": 128,
+   "pbr": true
+  },
+  "gold_block": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/gold_block.png",
+   "size": 128,
+   "pbr": true
+  },
+  "grass_top": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/grass_block_top.png",
+   "size": 128,
+   "pbr": true
+  },
+  "tall_grass": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/short_grass.png",
+   "size": 128,
+   "pbr": false
+  },
+  "fern": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/fern.png",
+   "size": 128,
+   "pbr": false
+  },
+  "flower_yellow": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/dandelion.png",
+   "size": 128,
+   "pbr": false
+  },
+  "flower_red": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/poppy.png",
+   "size": 128,
+   "pbr": false
+  },
+  "flower_blue": {
+   "pack": "Optimum Realism R4.2.1 64x.zip",
+   "file": "assets/minecraft/textures/block/cornflower.png",
+   "size": 64,
+   "pbr": false
+  },
+  "flower_white": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/oxeye_daisy.png",
+   "size": 128,
+   "pbr": false
+  },
+  "dry_shrub": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/dead_bush.png",
+   "size": 128,
+   "pbr": false
+  },
+  "reeds": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/sugar_cane.png",
+   "size": 128,
+   "pbr": false
+  },
+  "leaves": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/oak_leaves.png",
+   "size": 128,
+   "pbr": false
+  },
+  "pine_leaves": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/spruce_leaves.png",
+   "size": 128,
+   "pbr": false
+  },
+  "grass_side": {
+   "pack": "rotrBLOCKS V88 [3D Foliage] 128x 26.3-1.13.zip",
+   "file": "assets/minecraft/textures/block/grass_block_side.png",
+   "overlay": "assets/minecraft/textures/block/grass_block_side_overlay.png",
+   "size": 128,
+   "pbr": true
+  }
+ }
+}

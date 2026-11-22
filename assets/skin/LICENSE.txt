@@ -1,0 +1,4 @@
+Skins originais do projeto Lavra: Explorador, Botânica e Mineiro; criadas por código assistido por IA em 2026-11-14.
+Nenhuma textura ou personagem Mojang foi copiado. Textura640x640, dez vezes64 por eixo; layout normalizado classic/slim compatível.
+Fonte do formato: https://learn.microsoft.com/en-us/minecraft/creator/reference/content/skinpacksreference/skinpackjsonreference
+Pipeline reproduzível: tools/prepare-skin.py
