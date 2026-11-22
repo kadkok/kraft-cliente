@@ -256,7 +256,7 @@ export function chamarVeiculo(tipo, centro, rumo, sondar) {
   if (!Object.hasOwn(VEICULOS, tipo)) return null;
   const molhado = aquatico(tipo),
     cfg = VEICULOS[tipo];
-  for (let raio = 0; raio <= 112; raio += 4) {
+  for (let raio = 0; raio <= (tipo === 'helicoptero' ? 8 : 112); raio += 4) {
     const n = raio ? 16 : 1;
     for (let j = 0; j < n; j++) {
       const ang = rumo + (j * Math.PI * 2) / n,
@@ -264,6 +264,7 @@ export function chamarVeiculo(tipo, centro, rumo, sondar) {
         z = centro[2] + raio * Math.cos(ang);
       const a = sondar(x, z);
       if (tipo !== 'balao' && (molhado !== a.molhado || (molhado && a.agua - a.chao < 2.8))) continue;
+      if (tipo === 'helicoptero' && Math.abs(a.chao - centro[1]) > 3) continue;
       const y = (a.molhado ? a.agua : a.chao) + cfg.base;
       let h = rumo;
       if (tipo === 'aviao') {

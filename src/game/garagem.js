@@ -58,7 +58,7 @@ export function painelGaragem({ ui, game, openOverlay, closeOverlay, chamar, aca
       ui.toast('A garagem fica na superfície.');
       return;
     }
-    if (game.overlay) closeOverlay();
+    if (game.overlay) closeOverlay(false);
     openOverlay('garagem');
     destino.textContent = '';
     tela.hidden = false;
@@ -69,6 +69,7 @@ export function painelGaragem({ ui, game, openOverlay, closeOverlay, chamar, aca
   ui.el.corner.insertBefore(acesso, ui.el.corner.querySelector('.btn-menu'));
   const nomeHUD = h('strong', {}),
     leitura = h('span', {}),
+    controles = h('small', { class: 'garagem-controles' }),
     especial = botao('Ação', acao),
     sai = botao('Sair', sair),
     embarca = botao('Embarcar', entrar);
@@ -92,7 +93,7 @@ export function painelGaragem({ ui, game, openOverlay, closeOverlay, chamar, aca
   const hud = h(
     'div',
     { class: 'garagem-hud' },
-    h('div', { class: 'garagem-medidas' }, nomeHUD, leitura),
+    h('div', { class: 'garagem-medidas' }, nomeHUD, leitura, controles),
     cima,
     baixo,
     especial,
@@ -127,6 +128,11 @@ export function painelGaragem({ ui, game, openOverlay, closeOverlay, chamar, aca
       const qual = v || perto,
         def = VEICULOS[qual.tipo];
       nomeHUD.textContent = def.nome;
+      const heli = qual.tipo === 'helicoptero';
+      hud.classList.toggle('garagem-voo-teclado', heli && !!document.pointerLockElement && !game.toque);
+      controles.hidden = !heli || (game.toque && !!v);
+      if (!controles.hidden) controles.textContent = v ? 'Espaço sobe · C desce · Shift sai · V muda a câmera · F buzina' :
+        (game.toque ? 'Toque na cabine para entrar' : 'Botão direito na cabine para entrar');
       embarca.hidden = !!v;
       sai.hidden = especial.hidden = !v;
       cima.hidden = baixo.hidden = !(v && (v.tipo === 'balao' || v.tipo === 'helicoptero'));

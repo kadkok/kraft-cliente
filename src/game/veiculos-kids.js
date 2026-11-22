@@ -1,4 +1,6 @@
-import { SEA, Y_MIN } from '../../shared/constants.js';
+import { raycastVoxels } from '../world/raycast.js';
+import { ALCANCE_PORTA, distanciaCabine, saidaHelicoptero, assentarHelicoptero } from '../../shared/embarque-helicoptero.js';
+import { EYE_H, SEA, Y_MIN } from '../../shared/constants.js';
 import { LEVEL, SOLID } from '../../shared/blocks.js';
 import { dentroDoPalacio } from '../../shared/fortaleza.js';
 import {
@@ -35,7 +37,9 @@ export function initGaragem({
     proximo = false,
     rel = 0,
     relogioHUD = 0,
-    slug = '',
+    chaveSalva = '',
+    assentando = false,
+    aguardaSoltar = false,
     tempoSolo = 0;
   const remotos = new Map(),
     colunas = new Map();
@@ -94,16 +98,46 @@ export function initGaragem({
     });
   }
   function guardar() {
-    if (net.offline && veiculo && slug)
-      store.set('garagem.kids.' + slug, {
-        tipo: veiculo.tipo,
-        p: [veiculo.x, veiculo.y, veiculo.z],
-        h: veiculo.h,
-      });
+    if (!chaveSalva || !veiculo) return;
+    const v = veiculo;
+    store.set(chaveSalva, chaveSalva.startsWith('garagem.heli.rede.') && v.tipo !== 'helicoptero' ? null :
+      { tipo: v.tipo, p: [v.x, v.y, v.z], h: v.h });
+  }
+  function restaurar(chave) {
+    chaveSalva = chave;
+    const a = store.get(chave, null);
+    if (!a || !Object.hasOwn(VEICULOS, a.tipo) || !Array.isArray(a.p) || a.p.length !== 3 ||
+        !a.p.every(Number.isFinite) || !Number.isFinite(a.h) || (chave.startsWith('garagem.heli.rede.') && a.tipo !== 'helicoptero')) return;
+    veiculo = novoVeiculo(a.tipo, ...a.p, a.h);
+    instalarVisual(veiculo);
+    assentando = a.tipo === 'helicoptero';
+  }
+  const bloqueio = {};
+  const solido = (id) => !!SOLID[id];
+  function miraCabine(origem, direcao) {
+    const d = distanciaCabine(veiculo, origem, direcao);
+    if (!Number.isFinite(d)) return false;
+    const p = player.pos;
+    if (Math.hypot(origem[0]+d*direcao[0]-p[0], origem[1]+d*direcao[1]-(p[1]+EYE_H),
+        origem[2]+d*direcao[2]-p[2]) > ALCANCE_PORTA) return false;
+    raycastVoxels(world.getBlock, ...origem, ...direcao, Math.max(0,d-0.02), solido, bloqueio);
+    return !bloqueio.hit;
+  }
+  function portaAcessivel() {
+    if (Math.hypot(veiculo.x-player.pos[0], veiculo.z-player.pos[2]) > ALCANCE_PORTA+2 ||
+        !world.isLoaded(Math.floor(veiculo.x), Math.floor(veiculo.z))) return false;
+    const olho = [player.pos[0], player.pos[1]+EYE_H, player.pos[2]];
+    const dx = veiculo.x-olho[0], dy = veiculo.y+.25-olho[1], dz = veiculo.z-olho[2];
+    const d = Math.hypot(dx,dy,dz) || 1;
+    return miraCabine(olho, [dx/d,dy/d,dz/d]);
   }
   function entrar() {
-    if (!veiculo || game.dim || ocupado() || !posLivre(veiculo)) return false;
+    if (piloto || !veiculo || game.state !== 'PLAYING' || game.dim || ocupado() || !posLivre(veiculo)) return false;
+    if (veiculo.tipo === 'helicoptero' && !portaAcessivel()) return false;
     piloto = true;
+    assentando = false;
+    input.comandoHelicoptero = veiculo.tipo === 'helicoptero';
+    ui.el.hud.classList.toggle('pilotando-helicoptero', input.comandoHelicoptero);
     camAnt = game.camWant;
     game.camWant = VEICULOS[veiculo.tipo].camera;
     player.yaw = veiculo.h + Math.PI;
@@ -117,7 +151,20 @@ export function initGaragem({
   }
   function sair(desembarcar = true) {
     if (!piloto) return;
+    let porta;
+    if (desembarcar && veiculo?.tipo === 'helicoptero') {
+      colunas.clear();
+      porta = saidaHelicoptero(veiculo, sondar, p => world.isLoaded(Math.floor(p[0]), Math.floor(p[2])) &&
+        !player.collides(...p) && (!net.online || game.gmFortaleza || !dentroDoPalacio(game.gen.fortaleza, p)));
+      if (!porta) {
+        ui.toast('As saídas estão obstruídas. Mova o helicóptero para abrir espaço.');
+        return;
+      }
+    }
     piloto = false;
+    input.comandoHelicoptero = false;
+    ui.el.hud.classList.remove('pilotando-helicoptero');
+    aguardaSoltar = input.isDown('place');
     game.camWant = camAnt;
     game.audio?.removeEmitter?.('garagem-piloto');
     rastro?.limpar();
@@ -126,14 +173,18 @@ export function initGaragem({
         k = v.tipo;
       v.passeio = null;
       v.fumaca = false;
-      v.v = v.vx = v.vy = v.vz = v.rpm = 0;
-      if (desembarcar) {
+      v.v = v.vx = v.vz = 0;
+      if (k === 'helicoptero') {
+        assentando = true;
+        if (porta) player.teleport(...porta);
+      } else v.vy = v.rpm = 0;
+      if (desembarcar && k !== 'helicoptero') {
         const lado = 2.4,
           x = v.x + Math.cos(v.h) * lado,
           z = v.z - Math.sin(v.h) * lado,
           p = sondar(x, z);
         player.teleport(x, Math.max(p.chao + 0.05, p.molhado ? p.agua + 0.1 : 0, v.y), z);
-        if (k === 'aviao' || k === 'helicoptero') {
+        if (k === 'aviao') {
           [v.x, v.y, v.z, v.h] = v.origem;
           v.voo = false;
           v.pitch = v.roll = 0;
@@ -155,6 +206,7 @@ export function initGaragem({
     }
     const rumo = player.yaw + Math.PI;
     const origem = [player.pos[0] + Math.sin(rumo) * 4, player.pos[1], player.pos[2] + Math.cos(rumo) * 4];
+    colunas.clear();
     const candidato = chamarVeiculo(tipo, origem, rumo, sondar);
     if (!candidato || !posLivre(candidato)) {
       painel.erro(
@@ -169,7 +221,11 @@ export function initGaragem({
     if (piloto) sair(false);
     veiculo = candidato;
     instalarVisual(veiculo);
-    entrar();
+    assentando = false;
+    if (tipo === 'helicoptero') {
+      ui.toast(game.toque ? 'Helicóptero estacionado. Toque na cabine para entrar.' :
+        'Helicóptero estacionado. Aproxime-se e clique com o botão direito na cabine.');
+    } else entrar();
     guardar();
     return true;
   }
@@ -231,7 +287,8 @@ export function initGaragem({
     modelo?.liberar();
     modelo = null;
     veiculo = null;
-    proximo = false;
+    proximo = assentando = aguardaSoltar = false;
+    chaveSalva = '';
     for (const r of remotos.values()) r.visual?.liberar();
     remotos.clear();
     colunas.clear();
@@ -249,7 +306,7 @@ export function initGaragem({
       corpo.root.visible = false;
       return;
     }
-    corpo.root.position.y -= 0.48;
+    corpo.root.position.y -= v.tipo === 'helicoptero' ? 1.01 : 0.48;
     corpo.root.rotation.y = v.h + Math.PI;
     corpo.legL.rotation.x = corpo.legR.rotation.x = 1.12;
     corpo.armL.rotation.x = corpo.armR.rotation.x = 0.67;
@@ -302,26 +359,25 @@ export function initGaragem({
     }
     if (m.t !== 'welcome' && m.t !== 'offline') return;
     apagar();
-    slug = game.slug;
-    if (!game.dim && net.offline) {
-      const a = store.get('garagem.kids.' + slug, null);
-      if (
-        a &&
-        Object.hasOwn(VEICULOS, a.tipo) &&
-        a.p?.length === 3 &&
-        a.p.every(Number.isFinite) &&
-        Number.isFinite(a.h)
-      ) {
-        veiculo = novoVeiculo(a.tipo, ...a.p, a.h);
-        instalarVisual(veiculo);
-      }
-    }
+    if (!game.dim && net.offline) restaurar('garagem.kids.' + game.slug);
     for (const p of m.players || []) receber(p.id, p.p, p.veiculo, p.f, p.r?.[0], p.r?.[1]);
   });
-  game.hooks.interact.unshift((_dt, jogando) => {
-    if (!jogando || game.overlay) return false;
+  game.hooks.interact.unshift((_dt, jogando, origem, direcao) => {
+    if (!jogando || game.overlay || game.dim) return false;
+    if (aguardaSoltar) {
+      aguardaSoltar = input.isDown('place');
+      if (aguardaSoltar) return true;
+    }
     if (piloto) {
+      if (veiculo.tipo === 'helicoptero' && input.wasPressed('sneak')) {
+        sair();
+        return true;
+      }
       if (input.wasPressed('interact')) acao();
+      return true;
+    }
+    if (veiculo?.tipo === 'helicoptero' && input.wasPressed('place') && miraCabine(origem, direcao)) {
+      entrar();
       return true;
     }
     if (proximo && input.wasPressed('interact')) return entrar();
@@ -347,7 +403,7 @@ export function initGaragem({
         lado: intencao.x,
         camera: player.yaw + Math.PI,
         sobe: intencao.jump || painel.teclas.sobe,
-        desce: intencao.sneak || painel.teclas.desce,
+        desce: (v.tipo === 'helicoptero' ? input.isDown('baixarColetivo') : intencao.sneak) || painel.teclas.desce,
       },
       ambiente,
       dt,
@@ -403,14 +459,17 @@ export function initGaragem({
           });
         else game.audio?.removeEmitter?.('garagem-piloto');
       }
-    } else rastro?.atualizar(null, dt);
-    proximo =
-      !!veiculo &&
-      !piloto &&
-      Math.hypot(veiculo.x - player.pos[0], veiculo.y - player.pos[1], veiculo.z - player.pos[2]) < 6;
+    } else {
+      rastro?.atualizar(null, dt);
+      if (assentando && veiculo && game.state === 'PLAYING' && !game.overlay) {
+        assentando = assentarHelicoptero(veiculo, sondar(veiculo.x, veiculo.z), dt);
+        modelo?.atualizar(veiculo, dt);
+        if (!assentando) guardar();
+      }
+    }
     if (modelo)
       modelo.raiz.visible = piloto
-        ? game.camDist > 0.45
+        ? veiculo.tipo === 'helicoptero' || game.camDist > 0.45
         : Math.hypot(veiculo.x - player.pos[0], veiculo.z - player.pos[2]) < 200;
     for (const [id, r] of remotos) {
       const v = r.v,
@@ -434,6 +493,8 @@ export function initGaragem({
       if (corpo?.root.visible) posar(corpo, v);
     }
     if ((relogioHUD -= dt) <= 0) {
+      proximo = !!veiculo && !piloto && (veiculo.tipo === 'helicoptero' ? portaAcessivel() :
+        Math.hypot(veiculo.x-player.pos[0], veiculo.y-player.pos[1], veiculo.z-player.pos[2]) < 6);
       painel.atualizar(piloto ? veiculo : null, proximo ? veiculo : null);
       relogioHUD = 0.12;
     }
@@ -441,6 +502,9 @@ export function initGaragem({
   addEventListener('pagehide', guardar);
   return {
     abrir: painel.abrir,
+    restaurarNaRede(nome) {
+      if (net.online && !game.dim && !chaveSalva) restaurar('garagem.heli.rede.' + game.slug + '.' + nome.toLowerCase());
+    },
     chamar,
     sair,
     acao,

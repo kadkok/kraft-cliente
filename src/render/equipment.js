@@ -88,7 +88,7 @@ export function installEquipment(ctx) {
       stats.key=key;
     }
     if(real)real.material.envMapIntensity=.12+.8*(1-(U.uNight?.value||0));   // de noite o aço não reflete céu claro
-    const active=game.state==='PLAYING'&&!game.overlay&&!game.xr?.presenting;
+    const active=game.state==='PLAYING'&&!game.overlay&&!game.xr?.presenting&&game.garagem?.atual?.tipo!=='helicoptero';
     fp.root.visible=active&&game.camDist<.6;held.visible=active&&kind!=='none';near.visible=kind!=='none';
     const swing=active&&input.isDown('break');phase=swing?phase+dt*11:phase*Math.exp(-dt*14);
     let hit=swing?Math.sin(phase)*.55:Math.sin(phase)*.12,conj=null,hit3=0;

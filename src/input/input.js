@@ -10,7 +10,7 @@ export const ACTIONS = [
   'mini',                                  // alterna modo mini-bloco (1/4 de bloco, 0,5 x 0,5 x 1 m)
   'trunkMode',                             // alterna tronco redondo/tubular vs quadrado (cubo)
   'collect',                               // pega os itens soltos perto (game/items.js)
-  'axe',
+  'axe', 'baixarColetivo',
   'magnet',                                // liga/desliga o ímã das peças livres (objects/mao.js)
   // peça na mão ou a colocar (só no modo de forma): inclinar, comprimento, grossura, distância, carimbar, marcar/desfazer conjunto
   'tiltU', 'tiltD', 'longer', 'shorter', 'thicker', 'thinner', 'far', 'near', 'stamp', 'pjoin', 'psplit',
@@ -23,6 +23,7 @@ export function createInput() {
   const look = { dx: 0, dy: 0 };
   const api = {
     hotbar: -1,                // pedido de selecionar um espaço (0..8), -1 = nada
+    comandoHelicoptero: false,
     shapeMode: false,          // com uma forma escolhida, R/F/T/G viram tamanho e giro (ALT_KEYS); quem liga é o editor
     aim: null,                 // {x, y} em pixels: mirar por um ponto da tela (toque)
     enabled: true,
@@ -117,7 +118,7 @@ export function attachKeyboardMouse(input, canvas, opts) {
       if (now - lastForward < DOUBLE_TAP_MS) dash.set('sprint', true);
       lastForward = now;
     }
-    const a = (input.shapeMode && ALT_KEYS[e.code]) || KEYS[e.code];
+    const a = input.comandoHelicoptero && e.code === 'KeyC' ? 'baixarColetivo' : (input.shapeMode && ALT_KEYS[e.code]) || KEYS[e.code];
     if (a) src.set(a, true);
     if (e.code.startsWith('Digit')) { const n = Number(e.code.slice(5)); if (n >= 1 && n <= 9) input.hotbar = n - 1; }
   };
@@ -127,6 +128,7 @@ export function attachKeyboardMouse(input, canvas, opts) {
     if (e.code === 'KeyW') dash.set('sprint', false);
     // solta os dois papéis: o modo pode ter mudado com a tecla apertada
     const a = KEYS[e.code], b = ALT_KEYS[e.code];
+    if (e.code === 'KeyC') src.set('baixarColetivo', false);
     if (a) src.set(a, false);
     if (b) src.set(b, false);
   };

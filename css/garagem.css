@@ -111,3 +111,25 @@
     padding: 0.28rem 0.42rem;
   }
 }
+
+.garagem-hud.garagem-voo-teclado {
+  left: calc(.7rem + var(--safe-l, 0px));
+  bottom: calc(.8rem + var(--safe-b, 0px));
+  top: auto;
+  transform: none;
+  max-width: min(20rem, 36vw);
+  pointer-events: none;
+}
+.garagem-voo-teclado button {
+  display: none;
+}
+.garagem-voo-teclado .garagem-controles {
+  margin-top: .2rem;
+  line-height: 1.35;
+  color: #d7e5e7;
+}
+
+#hud.pilotando-helicoptero .hotbar,
+#hud.pilotando-helicoptero .hint {
+  display: none;
+}

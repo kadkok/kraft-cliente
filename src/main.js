@@ -242,6 +242,7 @@ const net = createNet({
   },
   spawned(name) {
     game.name = name;
+    game.garagem?.restaurarNaRede(name);
     store.set('nome', name);
     if (game.state === 'MENU') {
       placePlayer();
@@ -438,8 +439,8 @@ const ui = createUI({
     chatOpen(prefix) { if (game.state === 'PLAYING') { openOverlay('chat'); ui.chatOpen(prefix); } },
     chatSend(text) {
       if (/^\/(garagem|veiculo)(?:\s|$)/i.test(text)) {
-        closeOverlay();
         const arg=text.trim().split(/\s+/)[1]?.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+        closeOverlay(!!arg || game.dim !== 0);
         if (!arg) game.garagem.abrir();
         else if (arg==='sair') game.garagem.sair();
         else game.garagem.chamar(arg === 'carro' ? 'jipe' : arg === 'heli' ? 'helicoptero' : arg);
@@ -599,6 +600,7 @@ function closeOverlay(recapturar = true) {
   if (game.state === 'PLAYING' && !game.overlay) { ui.screen(null); if (recapturar) lock(); }
 }
 document.addEventListener('pointerlockchange', () => {
+  if (document.pointerLockElement === canvas && game.overlay) { unlock(); return; }
   // Esc solta o ponteiro: sem tela aberta, isso é "pausar"
   if (document.pointerLockElement !== canvas && game.state === 'PLAYING' && !game.overlay && wantsLock()) {
     if (!game.painelGM?.abrir(true)) transition('PAUSED');
@@ -1040,11 +1042,14 @@ function frameGame(dt, alpha) {
     if (!xr) {
       rig.position.set(eye[0], eye[1] - EYE_H, eye[2]);
       rig.rotation.set(0, player.yaw, 0);
-      pivot.position.set(0, EYE_H + (game.view !== 1 && game.garagem?.atual?.tipo === 'balao' ? 2.5 : 0), 0);
+      const montaria = game.garagem?.atual?.tipo;
+      const alturaOlhos = montaria === 'helicoptero' && game.view !== 1 ? 0.42 : EYE_H;
+      pivot.position.set(0, alturaOlhos + (game.view !== 1 && montaria === 'balao' ? 2.5 : 0), 0);
       pivot.rotation.set(player.pitch, 0, 0);
       let want = game.view === 1 ? 4.2 : 0;
       if (game.camWant !== undefined) want = game.camWant;
-      if (game.garagem?.atual) want = game.view === 1 ? 0 : game.garagem.distanciaCamera;
+      if (montaria === 'helicoptero') want = game.view === 1 ? game.garagem.distanciaCamera : 0;
+      else if (montaria) want = game.view === 1 ? 0 : game.garagem.distanciaCamera;
       if (want > 0) {
         raycastVoxels(world.getBlock, eye[0], eye[1], eye[2], -look[0], -look[1], -look[2], want + 0.3, (id) => SOLID[id] === 1, camHit);
         if (camHit.hit) want = Math.max(0.3, camHit.t - 0.3);
