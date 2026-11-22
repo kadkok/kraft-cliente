@@ -11,6 +11,7 @@ import {
   formaRede,
   formaValida,
 } from '../../shared/veiculos-kids.js';
+import { indicePresente, posePeloMovimento } from '../../shared/presenca-veiculos.js';
 import { criarVisual, criarRastro } from '../render/veiculos-kids.js';
 import { painelGaragem } from './garagem.js';
 
@@ -253,16 +254,30 @@ export function initGaragem({
     corpo.legL.rotation.x = corpo.legR.rotation.x = 1.12;
     corpo.armL.rotation.x = corpo.armR.rotation.x = 0.67;
   }
-  function receber(id, p, pose) {
+  function receber(id, p, pose, flags = 0, yaw = 0, pitch = 0) {
+    const agora = performance.now() / 1000;
+    const anterior = remotos.get(id);
+    if (!pose && p && indicePresente(flags) >= 0) {
+      const ultima = anterior?.v.tipo === TIPOS[indicePresente(flags)] ? anterior : null;
+      pose = posePeloMovimento(
+        flags,
+        yaw,
+        pitch,
+        p,
+        ultima?.amostra,
+        ultima ? agora - ultima.tempo : 0,
+        ultima ? agora - ultima.inicio : 0,
+      );
+    }
     if (!p || !formaValida(pose)) {
       remover(id);
       return;
     }
     const tipo = TIPOS[pose[0]];
-    let r = remotos.get(id);
+    let r = anterior;
     if (!r || r.v.tipo !== tipo) {
       r?.visual?.liberar();
-      r = { v: novoVeiculo(tipo, p[0], p[1], p[2], pose[1]), visual: null };
+      r = { v: novoVeiculo(tipo, p[0], p[1], p[2], pose[1]), visual: null, inicio: agora };
       remotos.set(id, r);
     }
     const v = r.v;
@@ -273,6 +288,8 @@ export function initGaragem({
     }
     [v.h, v.pitch, v.roll, v.v, v.rpm] = pose.slice(1, 6);
     v.fumaca = !!pose[6];
+    r.amostra = { x: p[0], z: p[2], h: v.h };
+    r.tempo = agora;
   }
   game.hooks.other.push((m) => {
     if (m.t === 'leave') {
@@ -299,7 +316,7 @@ export function initGaragem({
         instalarVisual(veiculo);
       }
     }
-    for (const p of m.players || []) receber(p.id, p.p, p.veiculo);
+    for (const p of m.players || []) receber(p.id, p.p, p.veiculo, p.f, p.r?.[0], p.r?.[1]);
   });
   game.hooks.interact.unshift((_dt, jogando) => {
     if (!jogando || game.overlay) return false;

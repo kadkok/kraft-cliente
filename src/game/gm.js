@@ -8,6 +8,7 @@ const CSS = `
 .gm-barra { width: min(100%, 52rem); max-width: 100%; max-height: 100%; min-width: min(15rem, 100%); min-height: min(10rem, 100%); box-sizing: border-box; resize: both; overflow: auto; padding: clamp(.65rem, 2vw, 1.3rem); color: #eef3f8; }
 .gm-tela.ampliada .gm-barra { width: 100% !important; height: 100% !important; resize: none; }
 .gm-cabeca, .gm-acoes { display: flex; align-items: center; flex-wrap: wrap; gap: .45rem; }
+.gm-cabeca { position: sticky; top: 0; z-index: 1; background: #192835; padding: .2rem 0 .45rem; }
 .gm-cabeca h2 { flex: 1; margin: 0; }
 .gm-grupos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: .65rem; margin: 1rem 0; }
 .gm-grupos fieldset { min-width: 0; margin: 0; padding: .65rem; border: 1px solid #506171; border-radius: .6rem; }
@@ -16,7 +17,7 @@ const CSS = `
 .gm-pin { font-size: .85rem; color: #d5deea; }
 .gm-grupos input, .gm-grupos select { display: block; width: 100%; box-sizing: border-box; margin: .2rem 0 .45rem; padding: .45rem; border: 1px solid #8698a6; border-radius: .35rem; color: #f4f7fa; background: #14212b; font: inherit; }
 .gm-barra :focus-visible { outline: 2px solid #ffcf7d; outline-offset: 2px; }
-.gm-navega { justify-content: flex-end; }
+
 `;
 
 export function initGm({ game, net, ui, mapa, openOverlay, closeOverlay, pausar, touch }) {
@@ -65,7 +66,14 @@ export function initGm({ game, net, ui, mapa, openOverlay, closeOverlay, pausar,
     closeOverlay(false);
     pausar();
   });
-  const cabeca = h('header', { class: 'gm-cabeca' }, h('h2', { id: 'gm-titulo', text: 'Painel GM' }), ampliar);
+  const cabeca = h(
+    'header',
+    { class: 'gm-cabeca' },
+    h('h2', { id: 'gm-titulo', text: 'Painel GM' }),
+    ampliar,
+    menu,
+    voltar,
+  );
   const grupos = h(
     'div',
     { class: 'gm-grupos' },
@@ -146,7 +154,6 @@ export function initGm({ game, net, ui, mapa, openOverlay, closeOverlay, pausar,
     },
     cabeca,
     grupos,
-    h('footer', { class: 'gm-acoes gm-navega' }, menu, voltar),
   );
   const tela = h('div', { class: 'gm-tela' }, bar);
   const acesso = botao(touch ? 'Painel GM' : 'Painel GM · F2', () => abrir());

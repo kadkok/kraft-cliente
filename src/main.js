@@ -80,6 +80,7 @@ import { initIlhasProps } from './game/ilhas-props.js';   // modelos 3D (.glb Me
 import { mapaSolo, sementeArquipelago } from '../shared/mapa-solo.js';
 import { initFerrovia } from './game/ferrovia.js';
 import { initGaragem } from './game/veiculos-kids.js';
+import { estadoComVeiculo } from '../shared/presenca-veiculos.js';
 import { initBalsa } from './game/balsa.js';   // balsas entre as ilhas do arquipélago (shared/balsa.js, server/balsa.js)
 import { initCosta } from './game/costa.js';   // costa Tidewater: vila costeira, píer/deck e barco 3D (shared/costa.js, server/costa.js)
 import { initMapa } from './game/mapa.js';   // mapa na tecla M   // aldeões das tribos, aldeias e cidades (server/povos.js)   // tela cheia + teclado travado: Ctrl+W não fecha o jogo   // bola de futebol, gol e placar (server/bola.js)
@@ -255,7 +256,7 @@ const net = createNet({
   state(list) {
     for (const s of list) if (s[0] !== net.id) {
       avatars.push(s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7]);
-      if (s[8]) game.garagem?.receber(s[0], [s[1],s[2],s[3]], s[8]);
+      if (s[8] || (s[7] >>> 5)) game.garagem?.receber(s[0], [s[1],s[2],s[3]], s[8], s[7], s[4], s[5]);
       else game.garagem?.remover(s[0]);
     }
   },
@@ -268,7 +269,7 @@ const net = createNet({
     }
     world.setBlock(m.x, m.y, m.z, m.id, m.m || 0);
   },
-  join(p) { if (p.id === net.id) return; if(p.veiculo) game.garagem?.receber(p.id,p.p,p.veiculo); avatars.add(p); game.players.set(p.id, p); refreshPlayers(); refreshStatus(); },
+  join(p) { if (p.id === net.id) return; if(p.veiculo || (p.f >>> 5)) game.garagem?.receber(p.id,p.p,p.veiculo,p.f,p.r?.[0],p.r?.[1]); avatars.add(p); game.players.set(p.id, p); refreshPlayers(); refreshStatus(); },
   leave(id) { avatars.remove(id); game.players.delete(id); refreshPlayers(); refreshStatus(); for (const f of game.hooks.other) f({ t: 'leave', id }); },
   chat(m) { ui.chatAdd(m.name, m.color, m.m, false); },
   sys(m) { ui.chatAdd('', '', m, true); },
@@ -1146,7 +1147,10 @@ function frameGame(dt, alpha) {
     // voo alto (mais de 300 m sobre o mar, game/player.js → multVoo): a vista orbital esconde o chão e a velocidade passa
     // de centenas de m/s; não monta pedaços que ninguém vai ver (poupa a CPU). Ao descer, volta a carregar onde se está.
     if (!(player.flying && player.pos[1] - SEA > 300)) world.update(player.pos[0], player.pos[2]);
-    net.sendState(performance.now(), player.pos, player.yaw, player.pitch, game.hotbar[game.sel] || 0, (player.flying ? 1 : 0) | (xr ? 2 : 0) | (player.sneaking ? 8 : 0), game.garagem?.pose);
+    const pose = game.garagem?.pose;
+    const estado = (player.flying ? 1 : 0) | (xr ? 2 : 0) | (player.sneaking ? 8 : 0);
+    net.sendState(performance.now(), player.pos, pose ? pose[1] + Math.PI : player.yaw, pose ? pose[2] : player.pitch,
+      game.hotbar[game.sel] || 0, estadoComVeiculo(estado, pose), pose);
   }
 
   const camWorld = camera.getWorldPosition(menuCam);
