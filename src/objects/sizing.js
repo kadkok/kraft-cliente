@@ -79,6 +79,28 @@ export function stepSize(k, dir, flat = false) {
   return k.map((v, i) => (flat && i === 2 ? v : Math.max(0.02, r3(v * f))));
 }
 
+// Centro da face de um bloco, um pouco para fora, onde um mockup encosta sem entrar no bloco.
+export function faceAnchor(x, y, z, nx, ny, nz, gap = 0.03) {
+  return [
+    r3(x + 0.5 + nx * (0.5 + gap)),
+    r3(y + 0.5 + ny * (0.5 + gap)),
+    r3(z + 0.5 + nz * (0.5 + gap)),
+  ];
+}
+
+// Segurar a imagem sobre a mesma face de um bloco a torna mockup.
+// Soltar antes disso posiciona a imagem onde ela está.
+// prev: { down, key, t } · commit: 'mockup' | 'place' | null
+export function mockupHold(prev, { down, faceKey, dt, hold = 0.55 }) {
+  const was = !!prev.down;
+  if (!down) return { down: false, key: null, t: 0, commit: was && prev.t < hold ? 'place' : null };
+  if (!faceKey) return { down: true, key: null, t: 0, commit: null };
+  const same = was && prev.key === faceKey;
+  const t = (same ? prev.t : 0) + Math.max(0, dt);
+  if (t >= hold && !(same && prev.t >= hold)) return { down: true, key: faceKey, t, commit: 'mockup' };
+  return { down: true, key: faceKey, t, commit: null };
+}
+
 // Giro somado, em graus, sempre entre -180 e 180, em degraus de TURN_STEP.
 export function stepTurn(deg, dir) {
   let d = Math.round(((deg || 0) + dir * TURN_STEP) / TURN_STEP) * TURN_STEP;

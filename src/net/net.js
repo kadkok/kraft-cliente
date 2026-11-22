@@ -18,7 +18,10 @@ export function createNet(on) {
         try { localStorage.setItem(chave, aparelho); } catch {}
       }
     }
-    return { t: 'spawn', name: nome, aparelho };
+    // chave de GM lembrada neste aparelho para este nome (server/world.js: gmAparelhos); só vai se existir
+    let gmtk = '';
+    try { gmtk = localStorage.getItem('kraft.gm.' + String(nome).trim().toLowerCase()) || ''; } catch {}
+    return /^[0-9a-f]{64}$/.test(gmtk) ? { t: 'spawn', name: nome, aparelho, gmtk } : { t: 'spawn', name: nome, aparelho };
   }
   const clock = createClock();  // online: acompanha o relógio do servidor; offline: é o próprio relógio do mundo
   // Versão do jogo com que esta página foi carregada. Página comum: a primeira que o servidor informar (ela acabou de
@@ -144,6 +147,10 @@ export function createNet(on) {
   }
 
   function handle(m) {
+    if (m && m.t === 'gm-chave' && typeof m.nome === 'string' && /^[0-9a-f]{64}$/.test(m.tk || '')) {   // senha de GM aceita: lembra o aparelho
+      try { localStorage.setItem('kraft.gm.' + m.nome.slice(0, 24), m.tk); } catch {}
+      return;
+    }
     switch (m.t) {
       case 'key': api.key = m.key; break;
       case 'welcome':

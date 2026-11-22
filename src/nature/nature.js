@@ -354,6 +354,8 @@ export function initNature({ game, world, net, scene, camera, atmosphere, lightP
 
     // bichos: cada um desenhado onde o corpo dele está no servidor, deslizando entre os dois últimos retratos
     for (const key in skins) skins[key].begin();
+    // Baleia de verdade mais perto (m): o canto debaixo d'água só toca se houver uma (game.audio lê nat.baleiaDist).
+    let baleiaDist = Infinity;
     if (game.dim === 0 && groups.size) {
       const t = nat.time(), tr = t - 0.2;
       for (const g of groups.values()) {
@@ -361,6 +363,7 @@ export function initNature({ game, world, net, scene, camera, atmosphere, lightP
         if (!skin || !s) continue;
         const vis = presence(g, t);
         if (vis <= 0.01) continue;
+        if (g.k === 'baleia') baleiaDist = Math.min(baleiaDist, Math.hypot(s.b[1] / 100 - cam.x, s.b[3] / 100 - cam.z));
         // par de retratos que cerca o instante desenhado (antes ia sempre entre os dois últimos e, com o atraso maior
         // que o intervalo entre retratos, o bicho andava aos trancos: parava, saltava)
         let RA = s.a, RB = s.b, TA = s.ta, TB = s.tb;
@@ -401,13 +404,15 @@ export function initNature({ game, world, net, scene, camera, atmosphere, lightP
               if (g.k === 'bando') game.audio.play(Math.random() < 0.35 ? 'ambiente.corvo' : 'ambiente.passaro', 0.45, 0.92 + Math.random() * 0.16, 'stone', p, { vel });
               else if (g.k === 'sapos' && g.m === 'coaxar') game.audio.play('ambiente.sapo', 0.45, 0.9 + Math.random() * 0.2, 'stone', p, { vel });
               else if (g.k === 'rebanho' && speed > 1.8) game.audio.play('ambiente.galope', 0.4, 0.9 + Math.random() * 0.18, 'grass', p, { vel });
-              else if (g.k === 'baleia' || g.k === 'orca') game.audio.play('ambiente.baleia', 0.55, 0.9 + Math.random() * 0.14, 'water', p, { vel });
+              // Só o sopro de verdade (mar.whale_blow), e só com o bicho na flor d'água: é quando ele respira.
+              else if ((g.k === 'baleia' || g.k === 'orca') && wy > SEA - 2.5) game.audio.play('whale_blow', 0.55, 0.9 + Math.random() * 0.14, 'water', p, { vel });
             }
           }
         }
       }
     }
     for (const key in skins) skins[key].end();
+    nat.baleiaDist = baleiaDist;
   });
 
   return nat;

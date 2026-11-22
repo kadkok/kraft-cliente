@@ -8,7 +8,7 @@ import { CW, SEA, CHUNK_VOL, DIM_MACRO, DIM_NANO0, FRACTAL, Y_MIN, Y_TOP } from 
 import { faixaDe as faixaFundo } from './minerios.js';
 import { B, KIND, K_CUBE } from './blocks.js';
 import { createSimplex, hash3, rand2, rand3, clamp, lerp, smoothstep } from './noise.js';
-import { createArquipelago, mapaValido, PRAIA } from './arquipelago.js';
+import { createArquipelago, mapaValido, PRAIA, FOSSA } from './arquipelago.js';
 
 export const BIOME = { OCEAN: 0, BEACH: 1, PLAINS: 2, FOREST: 3, TAIGA: 4, SNOW: 5, DESERT: 6, SAVANNA: 7, ALPINE: 8 };
 
@@ -96,6 +96,12 @@ export const RIO = Object.freeze({
 export const RIO_TETO = Math.max(...RIOS.map((r) => r.y)) + RIO.vaoMax;   // célula mais alta de qualquer rio (−14)
 const BASALTO_BAIXO_MIN = -10;   // a base do basalto varia de −10 a −4 (generate): abaixo disso, só rocha profunda
 export const SEM_RIO = Object.freeze([Object.freeze({ x0: 124.5, x1: 176.5, z0: -147.5, z1: -119.5, folga: 12 })]);
+// Fossas abissais (22/11/2026; dado do mapa de arquipélago, `mapa.fossas`, shared/arquipelago.js). Dentro da fossa a
+// coluna desce abaixo de y 3 (o resto do gerador nunca desce): o piso fica, no mínimo, uma camada acima das duas de
+// rocha-mãe sorteada. Como o que guia é o mapa do mundo (dado), não uma constante de código, mundo sem `fossas` sai
+// idêntico ao de antes, bloco a bloco. Nenhum rio subterrâneo dentro da fossa nem a menos de FOSSA.folgaRio metros
+// dela (os rios têm vão de ar; encostados na água da fossa, a lei da água sairia movendo tudo): ver leitoRio.
+export const Y_PISO_FOSSA = Y_MIN + 3;
 
 export function createWorldGen(seed, dim = 0, opt = null) {
   seed = seed >>> 0;
@@ -155,10 +161,16 @@ export function createWorldGen(seed, dim = 0, opt = null) {
   const temIlhas = !!(arq && arq.ilhas.length);   // ilhas temáticas (shared/ilhas.js): clima, superfície e árvores do tema
   const temObras = !!(arq && arq.obras);          // obras do próprio mundo (cais das balsas, cidade): blocos do gerador
   const AJ = { kind: 0, dens: 0, th: 0, rad: 0, clareira: 0 };
+  const fossas = arq && arq.fossas.length ? arq.fossas : null;   // fossas abissais do mapa (null = nenhuma: nada muda)
 
+  // y do bloco de cima a partir da altura relativa. Coluna afundada por uma fossa (h < h0) pode descer abaixo de 3,
+  // até Y_PISO_FOSSA, e nunca fica acima do que era (y0); toda outra coluna sai pela conta de sempre.
+  const yDeRel = (h) => { const y = Math.floor(SEA + h + 0.5); return y < 3 ? 3 : y > Y_TOP - 14 ? Y_TOP - 14 : y; };
+  const yDeFossa = (h, y0) => { const y = Math.floor(SEA + h + 0.5); return y < Y_PISO_FOSSA ? Y_PISO_FOSSA : y > y0 ? y0 : y; };
   function height(x, z) {
-    const y = Math.floor(SEA + heightRel(x, z) + 0.5);
-    return y < 3 ? 3 : y > Y_TOP - 14 ? Y_TOP - 14 : y;
+    if (!fossas) return yDeRel(heightRel(x, z));
+    const h0 = arq.relSemFossa(x, z), y0 = yDeRel(h0), h = arq.afundar(x, z, h0);
+    return h < h0 ? yDeFossa(h, y0) : y0;
   }
 
   // Clima base (sem o efeito da altitude). Devolve por variáveis de saída.
@@ -206,6 +218,8 @@ export function createWorldGen(seed, dim = 0, opt = null) {
   const HM = CW + 2;                       // mapa de alturas com 1 de margem
   const hmap = new Int16Array(HM * HM);
   const topBlock = new Uint8Array(CW * CW);
+  const fos = new Uint8Array(HM * HM);     // fossa: quantos blocos a coluna foi afundada (0 = intocada; satura em 255)
+  const tetoMin = new Int16Array(CW * CW); // fossa: maior y em que um veio de minério ainda pode entrar na coluna
   const treeCol = new Uint8Array(CW * CW);
   const tArr = new Float32Array(CW * CW);
   const mArr = new Float32Array(CW * CW);
@@ -302,6 +316,11 @@ export function createWorldGen(seed, dim = 0, opt = null) {
       if (d <= 0) return 0;
       if (d < 16) fade *= d / 16;
     }
+    if (fossas) {                                                                  // longe das fossas abissais do mapa
+      const d = arq.distFossas(x, z) - FOSSA.folgaRio;
+      if (d <= 0) return 0;
+      if (d < FOSSA.esmaeceRio) fade *= d / FOSSA.esmaeceRio;
+    }
     const s = rio.s;
     const wx = x + bil(C, 4, fx, fz), wz = z + bil(C, 8, fx, fz);
     const u = wx * RIO.leitoF + s[6], v = wz * RIO.leitoF + s[7], n = r2n(u, v);
@@ -331,9 +350,18 @@ export function createWorldGen(seed, dim = 0, opt = null) {
     let minY = Y_TOP;           // menor y com célula que não é cubo opaco (ar, água): abaixo disso o mesher nem olha
     const ilC = temIlhas ? arq.ilhaEm(x0 + 8, z0 + 8) : null;     // ilha temática deste pedaço (as caixas não se tocam)
 
-    // 1) alturas com margem de 1
-    for (let j = 0; j < HM; j++) {
-      for (let i = 0; i < HM; i++) hmap[i + j * HM] = height(x0 + i - 1, z0 + j - 1);
+    // 1) alturas com margem de 1. Pedaço que encosta numa fossa abissal marca também quais colunas ela afundou.
+    const comFossa = fossas !== null && arq.fossaPerto(x0 - 1, z0 - 1, x0 + CW, z0 + CW);
+    if (comFossa) {
+      for (let j = 0; j < HM; j++) for (let i = 0; i < HM; i++) {
+        const X = x0 + i - 1, Z = z0 + j - 1, h0 = arq.relSemFossa(X, Z), y0 = yDeRel(h0), h = arq.afundar(X, Z, h0);
+        const y = h < h0 ? yDeFossa(h, y0) : y0;
+        hmap[i + j * HM] = y; fos[i + j * HM] = y0 - y > 255 ? 255 : y0 - y;
+      }
+    } else {
+      for (let j = 0; j < HM; j++) {
+        for (let i = 0; i < HM; i++) hmap[i + j * HM] = height(x0 + i - 1, z0 + j - 1);
+      }
     }
 
     // 2) árvores candidatas (inclui as de fora cuja copa entra aqui)
@@ -370,6 +398,40 @@ export function createWorldGen(seed, dim = 0, opt = null) {
         tArr[x + z * CW] = tEff; mArr[x + z * CW] = moist;
         const above = H - SEA;
         const r = rand2(wx, wz, S_MISC ^ 0x9e37);
+
+        if (comFossa) {
+          const col = x + (z << 4);
+          tetoMin[col] = Y_TOP;                                            // coluna de sempre: os veios entram como antes
+          if (fos[hi] !== 0) {
+            // Coluna afundada por uma fossa abissal: a rocha de sempre até o piso (basalto no alto, rocha profunda
+            // embaixo), sedimento só onde é plano (piso e patamares: argila com manchas de cascalho; no lábio, a até
+            // 3 blocos do fundo de fora, a mesma mistura do mar fundo de fora, para a borda não aparecer), água —
+            // fonte — do piso até o mar. Sem ar, sem planta, sem árvore; os veios de minério ficam 2 blocos abaixo de
+            // qualquer face à mostra (não afloram na parede nem no piso).
+            const basaltTop = 9 + Math.floor(4 * k2(wx * 0.02 + 3, wz * 0.02 + 8));
+            const basaltBot = -4 - Math.floor(3 * (k2(wx * 0.017 - 41, wz * 0.017 + 17) + 1));
+            if (rand3(wx, Y_MIN + 1, wz, S_MISC) < 0.55) vox[col + 256] = B.BEDROCK;
+            if (rand3(wx, Y_MIN + 2, wz, S_MISC) < 0.2) vox[col + 512] = B.BEDROCK;
+            for (let y = BASALTO_BAIXO_MIN; y <= H; y++) vox[col + ((y + YO) << 8)] = y < basaltBot ? B.DEEP_STONE : y <= basaltTop ? B.BASALT : B.STONE;
+            let sed = 0;
+            if (slope <= 1) {
+              const patch = k2(wx * 0.045 + 9, wz * 0.045 - 4);            // as mesmas manchas do mar fundo
+              if (fos[hi] > 3) sed = patch < -0.35 ? B.GRAVEL : B.CLAY;
+              else sed = patch > 0.35 ? B.CLAY : patch < -0.25 ? B.GRAVEL : B.BASALT;
+            }
+            if (sed) for (let y = H; y >= H - 2; y--) { const vi = col + ((y + YO) << 8); if (vox[vi] !== B.BEDROCK) vox[vi] = sed; }
+            topBlock[x + z * CW] = vox[col + ((H + YO) << 8)];
+            if (H < SEA) {
+              for (let y = H + 1; y <= SEA; y++) vox[col + ((y + YO) << 8)] = B.WATER;
+              if (tEff < 0.15) vox[col + ((SEA + YO) << 8)] = B.ICE;
+              if (SEA > maxY) maxY = SEA;
+            }
+            if (H > maxY) maxY = H;
+            if (H + 1 < minY) minY = H + 1;
+            tetoMin[col] = Math.min(H, hmap[hi + 1], hmap[hi - 1], hmap[hi + HM], hmap[hi - HM]) - 2;
+            continue;
+          }
+        }
 
         let top, sub, subDepth = 3;
         const praiaS = arq && arq.p(wx, wz) < 0.5 ? arq.s(wx, wz) : null;
@@ -563,6 +625,7 @@ export function createWorldGen(seed, dim = 0, opt = null) {
                 if (d2 > r2) continue;
                 if (d2 > r2 * 0.45 && rand3(vx + dx, y, vz + dz, S_ORE) < 0.45) continue;
                 if (y <= 2 && eraRochaMae(vx + dx, y, vz + dz)) continue;   // onde era rocha-mãe, nada muda
+                if (comFossa && y > tetoMin[x + (z << 4)]) continue;        // fossa abissal: veio não aflora
                 const vi = x + (z << 4) + ((y + YO) << 8);
                 const cur = vox[vi];
                 if (cur === B.STONE || cur === B.BASALT) vox[vi] = ore;
@@ -602,6 +665,7 @@ export function createWorldGen(seed, dim = 0, opt = null) {
                 const d2 = dx * dx + dy * dy * 1.4 + dz * dz;
                 if (d2 > r2) continue;
                 if (d2 > r2 * 0.45 && rand3(vx + dx, y, vz + dz, S_FUNDO) < 0.45) continue;
+                if (comFossa && y > tetoMin[x + (z << 4)]) continue;        // fossa abissal: veio não aflora
                 const vi = x + (z << 4) + ((y + YO) << 8);
                 const cur = vox[vi];
                 if (cur === B.DEEP_STONE || cur === B.STONE || cur === B.BASALT) vox[vi] = ore;

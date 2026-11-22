@@ -853,7 +853,9 @@ function frameAudio(dt, cam, under) {
   place.speed = game.state === 'PLAYING' ? Math.hypot(player.vel[0], player.vel[1], player.vel[2]) : 0;
   place.fallSpeed = (game.state === 'PLAYING' && !player.onGround && !player.flying && !player.inWater && player.vel[1] < -6) ? -player.vel[1] : 0;
   place.rain = game.weather?.rain || 0;
-  place.wind = game.weather?.wind ? Math.min(1, Math.hypot(game.weather.wind[0], game.weather.wind[1]) / 14) : 0;
+  place.ventoMs = game.weather?.wind ? Math.hypot(game.weather.wind[0], game.weather.wind[1]) : 0;   // vento de verdade do mundo
+  place.wind = Math.min(1, place.ventoMs / 14);
+  place.baleiaDist = game.nature?.baleiaDist ?? Infinity;   // baleia de verdade mais perto (m)
   place.waveEnergy = (game.dim === 0 || game.dim === DIM_MACRO) ? waveEnergyOfWind(U.uWind.value.z) : 0;
   const vx = game.state === 'PLAYING' ? player.vel[0] : 0, vy = game.state === 'PLAYING' ? player.vel[1] : 0, vz = game.state === 'PLAYING' ? player.vel[2] : 0;
   game.audio.listen(cam.x, cam.y, cam.z, game.state === 'MENU' ? rig.rotation.y : player.yaw, vx, vy, vz);

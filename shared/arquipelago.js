@@ -18,6 +18,11 @@
 //                                     vegetação do tema; a região acima (a ilha principal) não muda um bloco
 //     cais:     [[x, z, dir, L], ...]  cais da balsa na ilha principal (shared/cais.js); o de cada ilha temática vai
 //                                     na ficha dela. São blocos do gerador, só dentro da caixa de cada cais
+//     fossas:   [[cx, cz, rx, rz, fundo, talude], ...]   (opcional; 22/11/2026) fossas abissais: elipse de centro
+//                                     (cx, cz) e semi-eixos rx (leste–oeste) e rz (norte–sul), em metros; `fundo` =
+//                                     altura do piso relativa ao mar (−110…−40); `talude` = largura da parede em
+//                                     metros (8…120), contada para DENTRO da elipse. Vale também fora da `caixa`.
+//                                     Quem grava num mundo salvo é tools/fossa/criar.mjs. Ver "Fossas abissais" abaixo
 //   }
 //
 // Saída para o gerador (worldgen.js):
@@ -28,6 +33,7 @@
 //   portos       [{ id, nome, cais }]: o cais da ilha principal e o de cada ilha temática
 //   obras(x0, z0, set, alt)   carimba no pedaço as obras do próprio mundo (cais; cidade da metrópole), ou null
 //   semArvore(x, z)           ali não nasce árvore (em cima de uma obra do mundo)
+//   relSemFossa(x, z), afundar(x, z, h), fossas, distFossas(x, z), fossaPerto(...)   ver "Fossas abissais"
 //
 // Determinismo: só + − × ÷, floor, sqrt, min/max (nada de sin/cos/pow). A grade é calculada uma vez por gerador, a
 // partir da altura original, em Float32Array (arredondamento IEEE, igual em todo aparelho e no servidor).
@@ -45,6 +51,67 @@ const sstep = (a, b, x) => { const t = x <= a ? 0 : x >= b ? 1 : (x - a) / (b - 
 export function mapaValido(m) {
   return !!(m && m.tipo === 'ilhas' && Array.isArray(m.caixa) && m.caixa.length === 4 && m.caixa.every(Number.isFinite)
     && m.caixa[2] > m.caixa[0] && m.caixa[3] > m.caixa[1] && Array.isArray(m.manter));
+}
+
+// ---- Fossas abissais (pedido do Kadmus, 22/11/2026: um naufrágio "enorme e muito profundo") -------------------------
+// O oceano do arquipélago tem 38 m; abrir um abismo com blocos editados custaria mais de um milhão de edições gravadas.
+// A fossa é DADO do mapa: servidor e aparelhos montam o mesmo buraco com o mesmo código.
+//   · fora da elipse `rel` sai idêntico, bit a bit, ao de antes; mapa sem `fossas` não muda um bloco;
+//   · dentro, além do talude: piso em `fundo`, com ondulação suave de sedimento (±1,35 m);
+//   · na faixa do talude: escarpa de rocha em patamares (o começo da queda serpenteia, os patamares sobem e descem,
+//     há contrafortes e rugosidade: tudo pelo ruído que o gerador entrega);
+//   · trava: só afunda onde o fundo de hoje já é mar aberto fundo (abaixo de FOSSA.mar; efeito inteiro abaixo de
+//     FOSSA.marCheio) e onde a proteção p(x, z) é 0. Nunca corta ilha, praia, plataforma rasa nem obra, e nunca sobe o chão;
+//   · entrada inválida é ignorada (fossaValida), e só as primeiras FOSSA.max contam.
+// A parede é medida pela família de elipses (rx − m, rz − m): m = quantos metros para dentro o ponto está (achado por
+// bisseção, só + − × e comparações). Com rx 260, rz 100 e talude 40 a largura real da parede fica entre 34,5 e 40 m.
+export const FOSSA = Object.freeze({
+  max: 16,                          // fossas por mapa
+  raioMin: 20, fundoMin: -110, fundoMax: -40, taludeMin: 8, taludeMax: 120,
+  mar: -30, marCheio: -34,          // trava do mar aberto fundo (altura relativa de hoje)
+  folgaRio: 22, esmaeceRio: 10,     // worldgen: nenhum rio subterrâneo a menos de `folgaRio` m da elipse (22 m = nenhum
+                                    // no pedaço de 16 × 16 que toca a fossa); dali o rio volta em `esmaeceRio` m
+});
+export const FOSSA_ALCANCE = FOSSA.folgaRio + FOSSA.esmaeceRio;   // além disto (por distFossa) a fossa não muda NADA (32 m)
+export function fossaValida(f) {
+  if (!Array.isArray(f) || f.length < 6) return false;
+  for (let i = 0; i < 6; i++) if (typeof f[i] !== 'number' || !Number.isFinite(f[i])) return false;
+  return f[2] >= FOSSA.raioMin && f[3] >= FOSSA.raioMin && f[4] >= FOSSA.fundoMin && f[4] <= FOSSA.fundoMax
+    && f[5] >= FOSSA.taludeMin && f[5] <= FOSSA.taludeMax;
+}
+// as fossas válidas de um mapa, já com o que se calcula uma vez só
+export function fossasDe(mapa) {
+  const out = [];
+  if (!mapa || !Array.isArray(mapa.fossas)) return out;
+  for (const f of mapa.fossas) {
+    if (out.length >= FOSSA.max) break;
+    if (!fossaValida(f)) continue;
+    const [cx, cz, rx, rz, fundo, talude] = f;
+    const rmin = Math.min(rx, rz), longe = 1 + FOSSA_ALCANCE / rmin;
+    out.push(Object.freeze({
+      cx, cz, rx, rz, fundo, talude, rmin,
+      mMax: Math.min(talude, rmin - 0.5),                                   // até onde a parede entra (a elipse de dentro não degenera)
+      patamares: Math.max(1, Math.min(6, Math.floor((FUNDO - fundo) / 15 + 0.5))),
+      q2Longe: longe * longe,                                               // (dx/rx)² + (dz/rz)² acima disto: fora do alcance
+      hDiag: Math.sqrt((rx * rx + rz * rz) / 2),                            // até onde a elipse vai na diagonal (função de suporte a 45°)
+    }));
+  }
+  return out;
+}
+// Distância do ponto até a elipse da fossa, estimada POR BAIXO: nunca passa da distância de verdade (é o que faz o
+// alcance valer: quem está a menos de N m de verdade está sempre a menos de N m por aqui). ≤ 0 dentro. É a maior de
+// três contas que, cada uma, fica aquém da distância real:
+//   · 1ª ordem: (F − 1) ÷ |∇F|, com F = raio normalizado (F é convexa); exata sobre os eixos, justa perto da borda;
+//   · distância até a caixa da elipse, e até a reta que encosta nela a 45°: seguram a conta além das pontas de uma
+//     elipse muito comprida, onde a 1ª ordem sozinha erraria por muito.
+// Medido: com rx 260 e rz 100, onde ela dá 22 m a distância real vai de 22 a 23,4 m, e onde dá 32 m, de 32 a 34,6 m;
+// numa elipse de 500 × 20, de 22 a 28,8 m e de 32 a 41,5 m.
+export function distFossa(f, x, z) {
+  const dx = x - f.cx, dz = z - f.cz, u = dx / f.rx, v = dz / f.rz, q2 = u * u + v * v;
+  if (q2 <= 1) return (Math.sqrt(q2) - 1) * f.rmin;
+  const F = Math.sqrt(q2), G = Math.sqrt(u * u / (f.rx * f.rx) + v * v / (f.rz * f.rz));
+  const ax = Math.abs(dx), az = Math.abs(dz), bx = Math.max(ax - f.rx, 0), bz = Math.max(az - f.rz, 0);
+  return Math.max((F - 1) * F / G, Math.sqrt(bx * bx + bz * bz), (ax + az) * 0.7071067811865476 - f.hDiag);
 }
 
 // baseRel(x, z): altura relativa original do gerador. ruido(x, z): ruído suave em −1..1 (o simplex do próprio gerador).
@@ -156,7 +223,7 @@ export function createArquipelago(baseRel, mapa, ruido, semente = 0) {
     return -3.06 + (FUNDO + 3.06) * t + n * (0.6 + 2.4 * t);
   }
 
-  function rel(x, z) {
+  function relSemFossa(x, z) {
     const d = s(x, z);
     if (d < -PRAIA) return baseRel(x, z);                              // miolo da ilha: exatamente o original
     const pr = p(x, z);
@@ -168,6 +235,71 @@ export function createArquipelago(baseRel, mapa, ruido, semente = 0) {
     if (w >= 1) return alvo;
     const h0 = baseRel(x, z);
     return h0 + (alvo - h0) * w;
+  }
+
+  // ---- fossas abissais (ver o cabeçalho "Fossas abissais") ----------------------------------------------------------
+  const FO = fossasDe(mapa), NF = FO.length;
+  // o ponto (dx, dz), relativo ao centro, está dentro da elipse encolhida em m metros? (sem divisão: m < rmin)
+  const dentroDe = (f, dx, dz, m) => { const a = f.rx - m, b = f.rz - m; return dx * dx * b * b + dz * dz * a * a <= a * a * b * b; };
+  // altura-alvo da fossa f num ponto de DENTRO da elipse, partindo do fundo de hoje h (devolve ≤ h quando afunda)
+  function perfil(f, x, z, dx, dz, h) {
+    let lo = 0, hi = f.mMax;                                                 // quantos metros para dentro da borda
+    if (dentroDe(f, dx, dz, hi)) lo = hi;
+    else for (let i = 0; i < 14; i++) { const m = (lo + hi) * 0.5; if (dentroDe(f, dx, dz, m)) lo = m; else hi = m; }
+    const tau = lo / f.talude;                                               // 0 na borda … 1 no fim da parede
+    let ini = 0;
+    if (tau < 1) {
+      ini = 0.3 * (0.5 + 0.5 * ruido(x * 0.45 + 31.7, z * 0.45 - 12.9));     // a queda começa de 0 a 30 % talude adentro
+      if (tau <= ini) return h;
+    }
+    // piso: sedimento com ondulação suave (±1,35 m; ondas de ~160 m e de ~45 m)
+    const piso = f.fundo + ruido(x * 0.3 + 5.5, z * 0.3 - 9.1) + 0.35 * ruido(x * 1.1 - 2.2, z * 1.1 + 6.6);
+    const queda = h - piso;                                                  // quanto há para descer aqui
+    if (queda <= 0) return h;
+    if (tau >= 1) return piso;                                               // além do talude
+    let t = (tau - ini) / (1 - ini);
+    t += 0.8 * ruido(x * 1.05 + 77.7, z * 1.05 - 55.5) * t * (1 - t);        // contrafortes e reentrâncias (~45 m)
+    const w0 = 1 - (1 - t) * (1 - t);                                        // escarpa: íngreme no alto, talude ao pé
+    const u = w0 * f.patamares + 1.4 * w0 * (1 - w0) * ruido(x * 1.9 - 7.3, z * 1.9 + 44.1);   // patamares que sobem e descem
+    const k = Math.floor(u);
+    let w = w0 + ((k + sstep(0.3, 0.7, u - k)) / f.patamares - w0) * 0.65;
+    w = w < 0 ? 0 : w > 1 ? 1 : w;
+    // rugosidade da rocha (~9 m de onda, até ±1,6 m; some na borda, no pé da parede e em fossa rasa)
+    const rug = Math.min(1.6, queda * 0.04) * ruido(x * 5.3 + 3.1, z * 5.3 + 8.8) * sstep(0, 0.2, w) * (1 - sstep(0.85, 1, w));
+    return h - queda * w + rug;
+  }
+  // Aplica as fossas ao fundo de hoje h = relSemFossa(x, z). Devolve o próprio h (o MESMO número) onde nada muda.
+  function afundar(x, z, h) {
+    let r = h, g = -1;
+    for (let i = 0; i < NF; i++) {
+      const f = FO[i], dx = x - f.cx, dz = z - f.cz;
+      if (dx >= f.rx || dx <= -f.rx || dz >= f.rz || dz <= -f.rz) continue;
+      const u = dx / f.rx, v = dz / f.rz;
+      if (u * u + v * v >= 1) continue;                                      // fora da elipse: idêntico
+      if (g < 0) g = p(x, z) > 0 ? 0 : sstep(-FOSSA.mar, -FOSSA.marCheio, -h);   // trava: mar aberto fundo e sem proteção
+      if (g <= 0) return h;
+      const alvo = perfil(f, x, z, dx, dz, h);
+      const c = h + (alvo - h) * g;
+      if (c < r) r = c;                                                      // só afunda; com duas fossas vale a mais funda
+    }
+    return r;
+  }
+  const rel = NF ? (x, z) => afundar(x, z, relSemFossa(x, z)) : relSemFossa;
+  // menor distância (estimada por baixo, distFossa) do ponto até uma fossa; além do alcance devolve LONGE
+  function distFossas(x, z) {
+    let d = LONGE;
+    for (let i = 0; i < NF; i++) {
+      const f = FO[i], u = (x - f.cx) / f.rx, v = (z - f.cz) / f.rz;
+      if (u * u + v * v >= f.q2Longe) continue;                              // (F − 1)·rmin ≥ alcance: longe demais
+      const e = distFossa(f, x, z);
+      if (e < d) d = e;
+    }
+    return d;
+  }
+  // alguma fossa encosta no retângulo (x0…x1, z0…z1)? (pela caixa da elipse; é só um filtro barato por pedaço)
+  function fossaPerto(x0, z0, x1, z1) {
+    for (let i = 0; i < NF; i++) { const f = FO[i]; if (x1 > f.cx - f.rx && x0 < f.cx + f.rx && z1 > f.cz - f.rz && z0 < f.cz + f.rz) return true; }
+    return false;
   }
 
   // ilhas temáticas (v: 2): cada uma responde dentro da própria caixa. Ficha inválida, ou caixa que encosta na região
@@ -193,7 +325,7 @@ export function createArquipelago(baseRel, mapa, ruido, semente = 0) {
     for (const q of portos) { const c = q.caixa; if (x >= c[0] - 2 && x <= c[2] + 2 && z >= c[1] - 2 && z <= c[3] + 2) return true; }
     return false;
   };
-  const base = { rel, s, p, caixa: [bx0, bz0, bx1, bz1], passo, NX, NZ, ilhas, ilhaEm: () => null, portos, obras, semArvore, mapa };
+  const base = { rel, relSemFossa, afundar, fossas: FO, distFossas, fossaPerto, s, p, caixa: [bx0, bz0, bx1, bz1], passo, NX, NZ, ilhas, ilhaEm: () => null, portos, obras, semArvore, mapa };
   if (!ilhas.length) return base;
   const ilhaEm = (x, z) => {
     for (let k = 0; k < ilhas.length; k++) { const c = ilhas[k].caixa; if (x >= c[0] && x <= c[2] && z >= c[1] && z <= c[3]) return ilhas[k]; }
@@ -204,5 +336,9 @@ export function createArquipelago(baseRel, mapa, ruido, semente = 0) {
     rel: (x, z) => { const il = ilhaEm(x, z); return il ? il.rel(x, z) : rel(x, z); },
     s: (x, z) => { const il = ilhaEm(x, z); return il ? il.s(x, z) : s(x, z); },
     p: (x, z) => (ilhaEm(x, z) ? 0 : p(x, z)),
+    // dentro de uma ilha temática vale o relevo dela e a fossa não age (worldgen.height pede relSemFossa + afundar
+    // quando o mapa tem fossas: sem isto as ilhas sairiam com o relevo do mar de antes). Fora delas, a conta da fossa.
+    relSemFossa: (x, z) => { const il = ilhaEm(x, z); return il ? il.rel(x, z) : relSemFossa(x, z); },
+    afundar: (x, z, h) => (ilhaEm(x, z) ? h : afundar(x, z, h)),
   };
 }

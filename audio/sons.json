@@ -14,12 +14,6 @@
   "ambiente.arqueda-1.ogg",
   "ambiente.arqueda-2.ogg"
  ],
- "ambiente.baleia": [
-  "mar.whale_blow.ogg",
-  "ambiente.baleia-1.ogg",
-  "ambiente.baleia-2.ogg",
-  "ambiente.baleia-3.ogg"
- ],
  "ambiente.barco": [
   "mar.boat_engine.ogg",
   "ambiente.barco-1.ogg"
@@ -58,11 +52,6 @@
  "ambiente.fogo": [
   "ambiente.fogo-1.ogg",
   "ambiente.fogo-2.ogg"
- ],
- "ambiente.fundo": [
-  "ambiente.fundo-1.ogg",
-  "ambiente.fundo-2.ogg",
-  "ambiente.fundo-3.ogg"
  ],
  "ambiente.gaivota": [
   "mar.gull.ogg",
@@ -121,19 +110,9 @@
   "ambiente.submerso-4.ogg"
  ],
  "ambiente.vento": [
-  "ambiente.vento-1.ogg",
-  "ambiente.vento-2.ogg",
   "ambiente.vento-3.ogg",
-  "ambiente.vento-4.ogg",
-  "ambiente.vento-5.ogg",
-  "ambiente.vento-6.ogg",
   "ambiente.vento-7.ogg",
   "ambiente.vento_forte-1.ogg"
- ],
- "ambiente.zumbido": [
-  "ambiente.zumbido-1.ogg",
-  "ambiente.zumbido-2.ogg",
-  "ambiente.zumbido-3.ogg"
  ],
  "bubble": [
   "bolha-1.ogg",

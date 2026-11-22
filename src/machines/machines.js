@@ -7,9 +7,11 @@ import {
   B, KIND, FUNC, FACING, DIRS, NATURAL, REPLACEABLE, SOLID, BLOCKS, rotateYaw,
   K_MODEL, F_SEAT, F_CANNON, F_DYNAMITE, F_WHEEL, LEVEL,
 } from '../../shared/blocks.js';
-import { Y_TOP } from '../../shared/constants.js';
+import { Y_TOP, SEA } from '../../shared/constants.js';
 import { buildBody, newState, stepBody, parkCells, toWorld, applyImpulse, syncRotation } from './physics.js';
 import { createParts } from './parts.js';
+import { createPeles } from './pele.js';
+import { peleDe } from '../../shared/barcos-pele.js';
 import { raycastVoxels } from '../world/raycast.js';
 
 const MAX_BLOCKS = 1500;
@@ -18,10 +20,12 @@ const NB = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]]
 export function initMachines(ctx) {
   const { game, world, player, net, ui, input, scene, interaction, effects, store } = ctx;
   const parts = createParts(() => game.icons);
+  const peles = createPeles();     // modelo .glb no lugar dos cubos, para a máquina com assinatura registrada (shared/barcos-pele.js)
   const list = new Map();          // id -> máquina
   const group = new THREE.Group(); group.name = 'maquinas'; scene.add(group);
   const chunkParts = new THREE.Group(); chunkParts.name = 'pecas'; scene.add(chunkParts);
-  const env = { getBlock: world.getBlock };
+  // o barco boia nas ondas que a tela desenha (render/oceano.js → game.mar), quando o mar do arquipélago está ligado
+  const env = { getBlock: world.getBlock, mar0: SEA, marAltura: (x, z) => (game.mar?.ligado && game.dim === 0 ? game.mar.altura(x, z) : NaN) };
   let seat = null;                 // { m, i } quando estou sentado
   let localId = -1;
   const tmp = [0, 0, 0], tmp2 = [0, 0, 0], q1 = new THREE.Quaternion(), q2 = new THREE.Quaternion();
@@ -35,7 +39,7 @@ export function initMachines(ctx) {
   // ---- entidade ---------------------------------------------------------------------------------
   function create(d) {
     if (list.has(d.id)) destroy(d.id);
-    const body = buildBody(d.blocks);
+    const body = buildBody(d.blocks, { casco: true });
     const p = d.p || [d.org[0] + body.com[0], d.org[1] + body.com[1], d.org[2] + body.com[2]];
     const st = newState(p, d.q);
     const g = new THREE.Group();
@@ -56,14 +60,19 @@ export function initMachines(ctx) {
       prevP: [...st.p], prevQ: [...st.q], target: null, sendT: 0, ctl: { drive: 0, steer: 0, lift: 0 }, sentSleep: false,
     };
     list.set(d.id, m);
+    // pele: os cubos aparecem só até o modelo chegar; se ele não abrir, ficam (m.pele.erro) e nada mais muda
+    const pele = peleDe(d.blocks);
+    if (pele) peles.vestir(m, pele);
     place(m, 1);
     return m;
   }
+  const comPele = (m) => !!m.pele && !m.pele.erro;
   function destroy(id) {
     const m = list.get(id);
     if (!m) return;
     if (seat && seat.m === m) standUp(false);
     if (game.audio) game.audio.removeEmitter?.('mach-' + id);
+    peles.despir(m);               // o modelo é dividido entre as máquinas: sai de m.g antes da limpeza abaixo
     group.remove(m.g);
     m.g.traverse((o) => { if (o.isMesh && o.geometry && o.geometry.groups && o.geometry.groups.length) o.geometry.dispose(); });
     list.delete(id);
@@ -139,7 +148,8 @@ export function initMachines(ctx) {
     player.flying = false;
     game.hideSelf = true;
     game.camWant = Math.min(30, Math.max(6, m.body.radius * 1.8 + 3));
-    ui.toast('W/S acelera · A/D vira · Espaço/Shift sobe e desce · clique atira · G estaciona · X desvira · F sai', 7000);
+    ui.toast(comPele(m) ? 'W/S acelera · A/D vira · G ancora · X desvira · F sai'
+      : 'W/S acelera · A/D vira · Espaço/Shift sobe e desce · clique atira · G estaciona · X desvira · F sai', 7000);
   }
   function standUp(tell = true) {
     if (!seat) return;
@@ -153,7 +163,15 @@ export function initMachines(ctx) {
     if (tell && !net.offline) net.send({ t: 'ms', id: m.id, seat: -1 });
   }
 
+  // Máquina com pele não volta à grade (o casco de blocos reapareceria no lugar do modelo): o G só a segura onde está.
+  function ancorar(m) {
+    const st = m.st;
+    if (Math.hypot(st.v[0], st.v[1], st.v[2]) >= 2) return ui.toast('Pare o barco antes de ancorar.');
+    st.v.fill(0); st.w.fill(0);
+    ui.toast('Barco ancorado.');
+  }
   function park(m) {
+    if (comPele(m)) return ancorar(m);
     const st = m.st;
     if (Math.hypot(st.v[0], st.v[1], st.v[2]) > 2) return ui.toast('Pare a máquina antes de estacionar.');
     const cells = parkCells(m.body, st, rotateYaw);
@@ -429,12 +447,13 @@ export function initMachines(ctx) {
     return false;
   });
 
-  // sentar numa máquina já montada: mirar num assento dela
+  // sentar numa máquina já montada: mirar em qualquer parte dela (com pele, no modelo: os cubos escondidos não contam)
   const ray = new THREE.Raycaster();
-  function machineSeatAt(o, d, max) {
+  function machineSeatAt(o, d, max, fresco) {
     ray.set(new THREE.Vector3(o[0], o[1], o[2]), new THREE.Vector3(d[0], d[1], d[2])); ray.far = max;
-    const hits = ray.intersectObjects(group.children, true);
-    if (!hits.length) return null;
+    const hits = ray.intersectObjects(group.children, true);    // cubos e peças das máquinas sem pele
+    const hp = peles.mira(ray, list, fresco);                   // malhas dos modelos (pele.js dosa a conta)
+    if (!hits.length || (hp && hp.t < hits[0].distance)) return hp;
     let n = hits[0].object;
     while (n.parent && n.parent !== group) n = n.parent;
     for (const m of list.values()) if (m.g === n) return { m, t: hits[0].distance };
@@ -442,15 +461,16 @@ export function initMachines(ctx) {
   }
   game.hooks.interact.unshift((dt, playing, o, d) => {
     if (seat) return false;
-    const h = machineSeatAt(o, d, Math.min(interaction.target.hit ? interaction.target.t : 7,game.treeAim?.t??Infinity));
+    const h = machineSeatAt(o, d, Math.min(interaction.target.hit ? interaction.target.t : 7,game.treeAim?.t??Infinity), input.wasPressed('interact'));
     if (!h) return false;
     const free = h.m.seats.findIndex((p) => p === 0);
-    ui.setHint(free >= 0 ? `Máquina (${h.m.blocks.length} blocos) — F ${free === 0 ? 'pilota' : 'vai de carona'}` : 'Máquina lotada');
+    const nome = comPele(h.m) ? h.m.pele.nome : `Máquina (${h.m.blocks.length} blocos)`;
+    ui.setHint(free >= 0 ? `${nome} — F ${free === 0 ? 'pilota' : 'vai de carona'}` : comPele(h.m) ? `${nome} — lotado` : 'Máquina lotada');
     if (playing && input.wasPressed('interact') && free >= 0) {
       if (net.offline) sit(h.m, free); else net.send({ t: 'ms', id: h.m.id, seat: free });
     }
     return true;
   });
 
-  return { list, assemble, sit, standUp, park, flip, explode, fire, ignite, get seat() { return seat; }, parts };
+  return { list, assemble, sit, standUp, park, flip, explode, fire, ignite, seatAt: machineSeatAt, get seat() { return seat; }, parts, peles };
 }

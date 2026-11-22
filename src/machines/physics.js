@@ -14,12 +14,24 @@ import { surfaceOf } from '../../shared/water.js';
 export const GRAV = 20;
 const THRUST = 60, PROP = 42, BALLOON = 30, DRIVE = 10, WHEEL_R = 0.5, SUSP = 0.45;
 const MAX_HULL = 420;
+// Água (barcos, 22/11/2026): o casco oco desloca água, a quilha segura o lado, a hélice submersa empurra com a força
+// dos motores e o leme vira conforme a velocidade. Valores ajustados em tools/barcos/simular.mjs.
+const MAX_VOIDS = 1600;         // células de ar dentro do casco que contam no empuxo (amostradas acima disso)
+const AGUA_FRENTE = 0.03;       // atrito linear da água ao longo do barco, por bloco submerso
+const AGUA_FRENTE_Q = 0.05;     // atrito quadrático ao longo do barco, por m² de seção (Vsub^(2/3))
+const AGUA_LADO = 1.8;          // atrito linear de lado (quilha), por bloco submerso
+const AGUA_SOBE = 1.6;          // amortecimento vertical, por bloco submerso
+const MOTOR_AGUA = 120;         // força de cada motor numa hélice submersa (N do jogo)
+const HELICE_AGUA_MAX = 600;    // o máximo que uma hélice submersa transmite
+const V_MAX_AGUA = 24;          // a hélice deixa de empurrar perto desta velocidade (m/s)
 
 const cross = (a, b, o) => { const x = a[1] * b[2] - a[2] * b[1], y = a[2] * b[0] - a[0] * b[2], z = a[0] * b[1] - a[1] * b[0]; o[0] = x; o[1] = y; o[2] = z; return o; };
 const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
 
 // Monta o corpo a partir da lista de blocos [x, y, z, id] (coordenadas inteiras locais).
-export function buildBody(blocks) {
+// opt.casco (máquinas): liga o modelo de casco na água (ar preso, quilha, hélice submersa, leme). Sem ele — árvores
+// caídas e o que mais usar este corpo — a água age como sempre agiu.
+export function buildBody(blocks, opt = {}) {
   let m = 0, cx = 0, cy = 0, cz = 0;
   for (const [x, y, z, id] of blocks) { const k = MASS[id] || 1; m += k; cx += k * (x + 0.5); cy += k * (y + 0.5); cz += k * (z + 0.5); }
   const com = [cx / m, cy / m, cz / m];
@@ -48,12 +60,47 @@ export function buildBody(blocks) {
     else if (fn === F_GYRO) parts.gyros++;
     if (exposed && fn !== F_WHEEL) hullAll.push(r); // a roda toca o chão pela suspensão, não pelo casco
   });
+  // ar preso dentro do casco: em cada camada, o vazio que não se alcança pelos lados a partir de fora da caixa e que
+  // tem bloco do barco embaixo na mesma coluna. É ele que faz o casco oco flutuar como um casco (o barco aberto em
+  // cima também: a água só entraria passando da borda, o que esta física não faz).
+  const voidsAll = opt.casco ? findVoids(blocks, occ) : [];
+  const stepV = Math.max(1, Math.ceil(voidsAll.length / MAX_VOIDS));
+  const voids = [];
+  for (let i = 0; i < voidsAll.length; i += stepV) { const c = voidsAll[i]; voids.push({ r: [c[0] + 0.5 - com[0], c[1] + 0.5 - com[1], c[2] + 0.5 - com[2]], w: stepV }); }
   // casco: no máximo MAX_HULL pontos, espalhados
   const stepH = Math.max(1, Math.ceil(hullAll.length / MAX_HULL));
   const hull = hullAll.filter((_, i) => i % stepH === 0);
   fwd = fwd || [0, 0, -1];
   const right = cross(fwd, [0, 1, 0], [0, 0, 0]);
-  return { blocks, mass: m, com, inv: [1 / ixx, 1 / iyy, 1 / izz], iavg: (ixx + iyy + izz) / 3, radius, cells, hull, parts, fwd, right, count: blocks.length };
+  return { blocks, mass: m, com, inv: [1 / ixx, 1 / iyy, 1 / izz], iavg: (ixx + iyy + izz) / 3, radius, cells, voids, hull, parts, fwd, right, count: blocks.length, casco: !!opt.casco };
+}
+
+function findVoids(blocks, occ) {
+  if (blocks.length < 8 || !blocks.every((b) => Number.isInteger(b[0]) && Number.isInteger(b[1]) && Number.isInteger(b[2]))) return [];
+  let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
+  for (const [x, y, z] of blocks) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); z0 = Math.min(z0, z); x1 = Math.max(x1, x); y1 = Math.max(y1, y); z1 = Math.max(z1, z); }
+  const W = x1 - x0 + 3, D = z1 - z0 + 3;            // uma volta de folga em xz: a borda da grade é "fora"
+  if (W * D * (y1 - y0 + 1) > 400000) return [];
+  const lowest = new Map();                          // coluna -> y do bloco mais baixo
+  for (const [x, y, z] of blocks) { const k = x + ',' + z, v = lowest.get(k); if (v === undefined || y < v) lowest.set(k, y); }
+  const out = [], seen = new Uint8Array(W * D), stack = [];
+  for (let y = y0; y <= y1; y++) {
+    seen.fill(0);
+    const filled = (i, j) => occ.has((x0 - 1 + i) + ',' + y + ',' + (z0 - 1 + j));
+    const vai = (i, j) => { if (i < 0 || j < 0 || i >= W || j >= D) return; const k = i + j * W; if (seen[k] || filled(i, j)) return; seen[k] = 1; stack.push(i, j); };
+    for (let i = 0; i < W; i++) { vai(i, 0); vai(i, D - 1); }
+    for (let j = 0; j < D; j++) { vai(0, j); vai(W - 1, j); }
+    while (stack.length) {
+      const j = stack.pop(), i = stack.pop();
+      vai(i + 1, j); vai(i - 1, j); vai(i, j + 1); vai(i, j - 1);
+    }
+    for (let j = 1; j < D - 1; j++) for (let i = 1; i < W - 1; i++) {
+      if (seen[i + j * W] || filled(i, j)) continue;
+      const x = x0 - 1 + i, z = z0 - 1 + j, lo = lowest.get(x + ',' + z);
+      if (lo !== undefined && lo < y) out.push([x, y, z]);
+    }
+  }
+  return out;
 }
 
 export function newState(p, q) {
@@ -77,6 +124,27 @@ function toBody(R, v, o) { const x = v[0], y = v[1], z = v[2]; o[0] = R[0] * x +
 const F = [0, 0, 0], T = [0, 0, 0], rw = [0, 0, 0], dw = [0, 0, 0], vp = [0, 0, 0], t1 = [0, 0, 0], t2 = [0, 0, 0], t3 = [0, 0, 0];
 const upW = [0, 0, 0], fwdW = [0, 0, 0], rightW = [0, 0, 0], hit = {};
 const solid = (id) => SOLID[id] === 1;
+
+// Quanto (0..1) de um bloco centrado em (x, yc, z) está debaixo d'água. No mar aberto do arquipélago a superfície é a
+// das ondas (env.marAltura(x, z) → y absoluto, o mesmo modelo que a tela desenha); fora dele, a do nível do bloco.
+const marCache = new Map();
+function waterFrac(gb, env, x, yc, z) {
+  const xi = Math.floor(x), zi = Math.floor(z), y = Math.floor(yc);
+  if (env.marAltura && env.mar0 !== undefined && yc > env.mar0 - 4 && yc < env.mar0 + 6) {
+    const k = xi * 131072 + zi;
+    let lv = marCache.get(k);
+    if (lv === undefined) {
+      const top = gb(xi, env.mar0, zi), up = gb(xi, env.mar0 + 1, zi);
+      lv = top > 0 && LEVEL[top] && !(up > 0 && LEVEL[up]) ? env.marAltura(xi + 0.5, zi + 0.5) : NaN;
+      if (!Number.isFinite(lv)) lv = NaN;
+      marCache.set(k, lv);
+    }
+    if (!Number.isNaN(lv)) return Math.min(1, Math.max(0, lv - (yc - 0.5)));
+  }
+  const wb = gb(xi, y, zi);
+  if (!(wb > 0) || !LEVEL[wb]) return 0;
+  return Math.min(1, Math.max(0, y + surfaceOf(wb, gb(xi, y + 1, zi)) - (yc - 0.5)));
+}
 
 function addForce(fx, fy, fz, r) {
   F[0] += fx; F[1] += fy; F[2] += fz;
@@ -135,21 +203,44 @@ function substep(body, st, ctl, h, env) {
   const vFwd = dot(v, fwdW);
   let grounded = 0;
 
-  // água: empuxo e arrasto por bloco
-  if (env.water !== false) {
+  // água: empuxo por bloco e pelo ar preso no casco; atrito de casco (fraco ao longo, forte de lado) e amortecimento
+  let vSub = 0;
+  if (env.water !== false && !body.casco) {
+    // corpo que não é casco (árvore caída…): empuxo e arrasto por bloco, como sempre foi
     for (let i = 0; i < body.cells.length; i++) {
       const c = body.cells[i];
       toWorld(R, c.r, rw);
       const x = Math.floor(p[0] + rw[0]), yc = p[1] + rw[1], y = Math.floor(yc), z = Math.floor(p[2] + rw[2]);
       const wb = gb(x, y, z);
       if (!(wb > 0) || !LEVEL[wb]) continue;
-      // quanto do bloco da peça está debaixo d'água: a superfície depende do nível (fonte 0,88; corrente menos)
       const frac = Math.min(1, Math.max(0, y + surfaceOf(wb, gb(x, y + 1, z)) - (yc - 0.5)));
       pointVel(st, rw, vp);
       addForce(-vp[0] * 1.1 * frac, frac * GRAV * 1.12 - vp[1] * 1.6 * frac, -vp[2] * 1.1 * frac, rw);
       grounded++;
     }
+  } else if (env.water !== false) {
+    marCache.clear();
+    const nC = body.cells.length, nV = body.voids ? body.voids.length : 0;
+    for (let i = 0; i < nC + nV; i++) {
+      const isCell = i < nC, c = isCell ? body.cells[i] : body.voids[i - nC], wgt = isCell ? 1 : c.w;
+      toWorld(R, c.r, rw);
+      const yc = p[1] + rw[1];
+      const frac = waterFrac(gb, env, p[0] + rw[0], yc, p[2] + rw[2]);
+      if (frac <= 0) continue;
+      const fw = frac * wgt;
+      vSub += fw;
+      pointVel(st, rw, vp);
+      const vf = dot(vp, fwdW), vr = dot(vp, rightW);
+      const kf = -vf * AGUA_FRENTE * fw, kr = -vr * AGUA_LADO * fw;
+      addForce(fwdW[0] * kf + rightW[0] * kr, fw * GRAV * 1.12 - vp[1] * AGUA_SOBE * fw + fwdW[1] * kf + rightW[1] * kr, fwdW[2] * kf + rightW[2] * kr, rw);
+      if (isCell) grounded++;
+    }
+    if (vSub > 0) {
+      const q = -AGUA_FRENTE_Q * Math.pow(vSub, 0.6667) * vFwd * Math.abs(vFwd);
+      F[0] += fwdW[0] * q; F[1] += fwdW[1] * q; F[2] += fwdW[2] * q;
+    }
   }
+  st.inWater = body.casco && vSub > 0.5;
 
   // propulsores e hélices
   const power = parts.motors > 0 ? Math.min(1, parts.motors * 4 / Math.max(1, parts.thrust.filter((t) => t.prop).length + parts.wheels.length * 0.5)) : 0;
@@ -157,6 +248,15 @@ function substep(body, st, ctl, h, env) {
   if (parts.gyros) for (const t of parts.thrust) if (t.dir[1] > 0.5) upThrust += t.prop ? PROP * power : THRUST;
   // com giroscópio, quem aponta para cima segura a altitude sozinho: o comando vira velocidade vertical desejada
   const hover = parts.gyros && upThrust > 0 ? Math.min(1, Math.max(0, (mass * GRAV + mass * 5 * (ctl.lift * 7 - v[1])) / (upThrust * Math.max(0.3, upW[1])))) : -1;
+  // hélices submersas: a força dos motores se divide entre elas (cada uma transmite no máximo HELICE_AGUA_MAX)
+  let nPropAgua = 0;
+  if (vSub > 0 && body.casco) for (const t of parts.thrust) {
+    t.agua = false;
+    if (!t.prop) continue;
+    toWorld(R, t.r, rw);
+    if (waterFrac(gb, env, p[0] + rw[0], p[1] + rw[1], p[2] + rw[2]) > 0.3) { t.agua = true; nPropAgua++; }
+  } else for (const t of parts.thrust) t.agua = false;
+  const forcaAgua = nPropAgua ? Math.min(HELICE_AGUA_MAX, MOTOR_AGUA * parts.motors / nPropAgua) : 0;
   for (const t of parts.thrust) {
     const df = dot(t.dir, body.fwd), du = t.dir[1], dr = dot(t.dir, body.right);
     let th = Math.max(0, df * ctl.drive) + Math.max(0, dr * ctl.steer);
@@ -167,7 +267,8 @@ function substep(body, st, ctl, h, env) {
     if (t.prop) t.spin += h * (6 + 60 * t.on * power);
     if (th <= 0) continue;
     toWorld(R, t.dir, dw); toWorld(R, t.r, rw);
-    let f = t.prop ? PROP * power * Math.max(0.15, 1 - Math.max(0, dot(v, dw)) / 70) : THRUST;
+    let f = t.agua ? forcaAgua * Math.max(0.08, 1 - Math.max(0, dot(v, dw)) / V_MAX_AGUA)
+      : t.prop ? PROP * power * Math.max(0.15, 1 - Math.max(0, dot(v, dw)) / 70) : THRUST;
     f *= th;
     addForce(dw[0] * f, dw[1] * f, dw[2] * f, rw);
   }
@@ -263,7 +364,15 @@ function substep(body, st, ctl, h, env) {
     cross(upW, [0, 1, 0], t1);
     T[0] += t1[0] * 16 * g - w[0] * 5 * g; T[2] += t1[2] * 16 * g - w[2] * 5 * g; T[1] += t1[1] * 16 * g;
     const wheelsDown = parts.wheels.some((x) => x.ground);
-    if (!wheelsDown) T[1] += (-ctl.steer * 1.7 - w[1]) * 6 * g;
+    if (!wheelsDown && !st.inWater) T[1] += (-ctl.steer * 1.7 - w[1]) * 6 * g;
+  }
+
+  // leme: na água o barco vira pela corrente que passa no casco (parado, quase não vira; de ré, vira ao contrário)
+  if (st.inWater && (ctl.steer !== 0 || parts.thrust.some((t) => t.agua))) {
+    const wy = dot(w, upW);
+    const alvo = -ctl.steer * Math.sign(vFwd || 1) * Math.min(0.3, 0.03 + 0.02 * Math.abs(vFwd)) * Math.min(1, 6 / Math.max(6, body.radius * 0.6));
+    const iy = 1 / body.inv[1], k = (alvo - wy) * 9 * iy;
+    T[0] += upW[0] * k; T[1] += upW[1] * k; T[2] += upW[2] * k;
   }
 
   // arrasto do ar

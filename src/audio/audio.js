@@ -30,11 +30,10 @@ const LOOP_KEYS = new Set([
   'ambiente.vento', 'ambiente.ventoforte', 'ambiente.arqueda', 'ambiente.mata', 'ambiente.agua', 'ambiente.cachoeira',
   'ambiente.submerso', 'ambiente.bolha', 'ambiente.chuva', 'ambiente.passaros', 'ambiente.grilos', 'ambiente.cigarras',
   'ambiente.fogo', 'ambiente.portal', 'ambiente.motor', 'ambiente.carro', 'ambiente.helice',
-  'ambiente.jato', 'ambiente.queimador', 'ambiente.barco', 'ambiente.fundo', 'ambiente.zumbido',
+  'ambiente.jato', 'ambiente.queimador', 'ambiente.barco',
   'ambiente.surf_far', 'ambiente.wind', 'ambiente.palms', 'ambiente.pier_lap', 'ambiente.under_reef',
   'ambiente.whale_song', 'ambiente.boat_engine', 'ambiente.boat_lap', 'ambiente.boat_rush',
 ]);
-const AMB_MUDO = new Set(['whale_blow', 'gull', 'tern', 'surf_crash', 'surf_wash', 'surf_backwash', 'gust', 'whisper']);
 const rnd = (a, b) => a + Math.random() * (b - a);
 const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
 const MAX_VOICES = { sfx: 28, amb: 32, mus: 72 };
@@ -100,7 +99,7 @@ export function createAudio(getVolume, getMusic = () => 0) {
     filter.connect(send).connect(conv).connect(master);
     busSfx = ctx.createGain(); busAmb = ctx.createGain(); busMus = ctx.createGain();
     for (const [node, bus] of [[busSfx, 'sfx'], [busAmb, 'amb'], [busMus, 'mus']]) routes.set(node, { bus });
-    busAmb.gain.value = 0; // MUDO de emergência (Kadmus, 19/11): ambiente silenciado até identificar o som
+    busAmb.gain.value = 2.4;
     busSfx.connect(filter); busAmb.connect(filter);
     busMus.connect(master);
     const musSend = ctx.createGain(); musSend.gain.value = 0.35;
@@ -505,7 +504,6 @@ export function createAudio(getVolume, getMusic = () => 0) {
 
   // Toca um som no mundo (pos != null) ou na cabeça (pos == null).
   function play(name, vol = 1, pitch = 1, material = 'stone', pos = null, opts = null) {
-    if (name.startsWith('ambiente.') || AMB_MUDO.has(name)) return; // MUDO de emergência (19/11)
     const v = getVolume();
     if (v <= 0 || !ensure() || ctx.state !== 'running' || voices.sfx >= MAX_VOICES.sfx) return;
     if (!allowEvent(name, material, pos)) return;
@@ -522,7 +520,6 @@ export function createAudio(getVolume, getMusic = () => 0) {
     else if (name === 'swim') keys.unshift(...(ear.underwater ? ['uw_swim', 'mar.swim', 'swim'] : ['mar.swim', 'swim']));
     else if (name === 'uw_swim') keys.unshift('uw_swim', 'mar.swim', 'swim');
     else if (name === 'gull') keys.push('ambiente.gaivota');
-    else if (name === 'whale_blow') keys.push('ambiente.baleia');
     else if (name === 'dig') keys.push('step_' + material, 'step.' + material, 'hit');
     else if (name === 'thunder') keys.push('boom');
     const maxDur = 0;
@@ -636,13 +633,8 @@ export function createAudio(getVolume, getMusic = () => 0) {
     beds.vento = noiseBed(pink, 'bandpass', 420, 0.5);
     beds.mata = noiseBed(white, 'highpass', 3400, 0.4);
     beds.agua = noiseBed(pink, 'lowpass', 760, 0.6);
-    beds.fundo = noiseBed(pink, 'lowpass', 170, 0.7);
-    const g = ctx.createGain(), mix = ctx.createGain(), f = ctx.createBiquadFilter(), o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), o3 = ctx.createOscillator();
-    g.gain.value = 0; f.type = 'lowpass'; f.frequency.value = 240;
-    o1.frequency.value = 55; o2.frequency.value = 55.6; o3.type = 'triangle'; o3.frequency.value = 82.7;
-    o1.connect(f); o2.connect(f); o3.connect(f); f.connect(mix).connect(g).connect(busAmb);
-    o1.start(); o2.start(); o3.start();
-    beds.zumbido = { g, mix, f, osc: [o1, o2, o3] };
+    // Sem leitos de "fundo" e "zumbido" (19/11, Kadmus): eram drones graves de 55–95 Hz sem fonte no mundo
+    // (debaixo de qualquer teto, em caverna, na Zona); um som só existe se algo no mundo o produz.
     beds.submerso = noiseBed(pink, 'lowpass', 155, 0.7);
     beds.chuva = noiseBed(pink, 'bandpass', 1150, 0.45);
     beds.passaros = silentBed();
@@ -732,16 +724,6 @@ export function createAudio(getVolume, getMusic = () => 0) {
     const a = Math.atan2(sz, sx) + rnd(-1.3, 1.3), d = rnd(18, 56);
     const pos = [ear.x + Math.cos(a) * d, ear.y + rnd(5, 17), ear.z + Math.sin(a) * d];
     play('tern', vol * 0.76, rnd(0.95, 1.05), 'water', pos, { reach: 1.7, refDist: 9 });
-  }
-  function whale(vol, env = null) {
-    if (!ear.underwater) {
-      const sx = env?.shoreX ?? 0.83, sz = env?.shoreZ ?? 0.55;
-      const a = Math.atan2(sz, sx) + rnd(-0.8, 0.8), d = rnd(24, 64);
-      const pos = [ear.x + Math.cos(a) * d, (env?.seaY ?? 48) + 1.0, ear.z + Math.sin(a) * d];
-      play('whale_blow', vol * 0.85, rnd(0.76, 0.92), 'water', pos, { reach: 2.0, refDist: 11 });
-      return;
-    }
-    sample(['whale_blow', 'ambiente.baleia'], () => pan(rnd(-0.75, 0.75), vol * 0.55), 1, rnd(0.88, 1.04));
   }
   function whisper(vol) {
     if (sample(['whisper'], () => pan(rnd(-0.9, 0.9), vol * 0.78), 1, rnd(0.92, 1.08))) return;
@@ -934,6 +916,9 @@ export function createAudio(getVolume, getMusic = () => 0) {
 
     const open = 1 - clamp(env.enclosed || 0, 0, 1), under = ear.underwater, quiet = env.playing ? 1 : 0.55;
     const rain = clamp(env.rain || 0, 0, 1), wnd = clamp(env.wind || 0, 0, 1);
+    // Vento que se ouve = vento de verdade do mundo (game.weather.wind, m/s). Calmaria (< 1 m/s) = nenhum som de vento;
+    // a brisa cresce até ~14 m/s. A altura só reforça o vento que existe (perfil do vento), nunca o cria.
+    const ar = clamp(((env.ventoMs ?? wnd * 14) - 1) / 13, 0, 1);
     const s = t - t0, gust = 0.55 + 0.45 * Math.sin(s * 0.23) * Math.sin(s * 0.071 + 1.3);
     const depth = clamp((env.depthBelowSurface || 0) / 12, 0, 1);
     filter.frequency.setTargetAtTime(under ? (520 - 240 * depth) : 20000, t, 0.09);
@@ -950,10 +935,11 @@ export function createAudio(getVolume, getMusic = () => 0) {
     const fly = Math.min(1, (env.speed || 0) / 26);
     const fallRush = !under && !env.zone ? clamp(((env.fallSpeed || 0) - 7.5) / 20, 0, 1) : 0;
     // Fora do espaço da fonte -> ganho vai a zero (vento não vaza para dentro de caverna fechada).
-    setG(beds.vento, under ? 0 : quiet * (open * (0.03 + 0.1 * (env.alt || 0) + 0.09 * wnd) * (0.5 + gust) + (open > 0.2 ? 0.28 * fly * fly : 0)) * (env.zone ? 1.5 : 1));
+    // Deslocamento do ar ao voar ou cair depressa (fly, arqueda) é real mesmo sem vento: vem do movimento de quem joga.
+    setG(beds.vento, under ? 0 : quiet * (open * 0.13 * Math.pow(ar, 0.8) * (1 + (env.alt || 0)) * (0.55 + 0.45 * gust) + (open > 0.2 ? 0.28 * fly * fly : 0)));
     if (beds.vento.f) beds.vento.f.frequency.setTargetAtTime(280 + 420 * gust + 900 * fly + (env.zone ? -120 : 0), t, 0.8);
     setG(beds.arqueda, fallRush * 0.28, 0.12);
-    setG(beds.mata, under ? 0 : quiet * (env.trees || 0) * open * (0.015 + 0.045 * (gust * gust + 0.5 * wnd)));
+    setG(beds.mata, under ? 0 : quiet * (env.trees || 0) * open * 0.06 * Math.pow(ar, 0.7) * (0.4 + 0.6 * gust * gust));
     const waveE = clamp(env.waveEnergy ?? 0, 0, 1);
     const seaLevel = seaWaveLevel(env.seaWater ?? 0, waveE);
     const swell = 0.6 + 0.4 * Math.sin(s * 0.85) * Math.sin(s * 0.31 + 0.7);
@@ -961,20 +947,19 @@ export function createAudio(getVolume, getMusic = () => 0) {
     // Rugido distante do mar (mar.surf_far.ogg), vento costeiro (mar.wind.ogg), palmeiras (mar.palms.ogg) e píer (mar.pier_lap.ogg)
     setG(beds.surf_far, under ? 0 : quiet * open * seaLevel * (0.14 + 0.12 * waveE), 0.45);
     const coastalPresence = clamp(Math.max(env.seaWater ?? 0, (env.beach ?? 0) * 0.8), 0, 1);
-    setG(beds.wind, under ? 0 : quiet * open * Math.max(coastalPresence * 0.9, wnd * 0.7) * (0.04 + 0.13 * Math.max(wnd, waveE)) * gustState.v, 0.35);
+    setG(beds.wind, under ? 0 : quiet * open * coastalPresence * 0.9 * 0.15 * Math.pow(ar, 0.8) * gustState.v, 0.35);
     const day = 1 - (env.night || 0);
-    setG(beds.palms, under ? 0 : quiet * open * coastalPresence * Math.min(1, (env.trees || 0) * 1.6 + (env.beach || 0) * 0.45) * (0.03 + 0.10 * gustState.v) * (0.35 + 0.65 * day), 0.5);
+    setG(beds.palms, under ? 0 : quiet * open * coastalPresence * Math.min(1, (env.trees || 0) * 1.6 + (env.beach || 0) * 0.45) * Math.pow(ar, 0.7) * (0.04 + 0.10 * gustState.v), 0.5);
     setG(beds.pier_lap, under ? 0 : quiet * open * (env.nearPier ? 0.18 : 0), 0.5);
     // Ambiência submersa under_reef + canto de baleia
     const hasReef = beds.under_reef?.sampled;
-    const hasSub = hasReef || beds.submerso?.sampled;
     setG(beds.under_reef, under ? 0.25 * (0.85 + 0.3 * depth) : 0, 0.22);
     setG(beds.submerso, under ? (hasReef ? 0.08 : 0.24) : 0, 0.22);
+    // Canto de baleia só com uma baleia de verdade a até 400 m (o som corre longe na água; mais perto, mais forte).
     const whaleSwell = 0.4 + 0.6 * Math.max(0, Math.sin(s * 0.11));
-    setG(beds.whale_song, under && !env.zone && !env.nano && (env.seaWater ?? env.water ?? 0) > 0.12 ? 0.13 * whaleSwell : 0, 0.8);
+    const baleia = clamp(1 - (env.baleiaDist ?? Infinity) / 400, 0, 1);
+    setG(beds.whale_song, under && !env.zone && !env.nano ? 0.16 * baleia * whaleSwell : 0, 0.8);
     setG(beds.bolha, under && !env.zone ? 0.11 : 0, 0.28);
-    setG(beds.fundo, under ? (hasSub ? 0.04 : 0.22) : quiet * (1 - open) * 0.11, 0.25);
-    setG(beds.zumbido, quiet * (env.zone ? 0.11 : under ? 0 : (1 - open) > 0.72 ? (1 - open) * (1 - open) * 0.06 : 0));
     setG(beds.chuva, under || env.zone || env.nano ? 0 : quiet * rain * open * 0.25, 0.45);
     const flora = Math.min(1, (env.trees || 0) * 1.4 + (env.grass || 0) * 0.5);
     setG(beds.passaros, under || env.zone || env.nano || open < 0.25 ? 0 : quiet * open * Math.max(0, day - 0.25) * (1 - 0.75 * rain) * flora * 0.16, 0.8);
@@ -990,13 +975,12 @@ export function createAudio(getVolume, getMusic = () => 0) {
       if ((env.night || 0) > 0.5 && (env.trees || 0) > 0.12 && (ev.owl -= dt) <= 0) { owl(amb * 0.75); ev.owl = rnd(12, 28); }
       if (day > 0.38 && (env.seaWater ?? env.water ?? 0) > 0.16 && (ev.gull -= dt) <= 0) { gull(amb * 0.76, env); ev.gull = rnd(7, 19); }
       if (day > 0.38 && (env.seaWater ?? env.water ?? 0) > 0.16 && (ev.tern -= dt) <= 0) { tern(amb * 0.68, env); ev.tern = rnd(8, 21); }
-      if ((env.seaWater ?? 0) > 0.35 && (ev.whale -= dt) <= 0) { whale(amb * 0.7, env); ev.whale = rnd(18, 38); }
     }
-    if (under && !env.zone && !env.nano && (ev.whale -= dt) <= 0) { whale(amb * 0.65, env); ev.whale = rnd(14, 32); }
     if (under && !env.zone && (ev.bubble -= dt) <= 0) { play('bubble', 0.28, rnd(0.9, 1.15), 'water'); ev.bubble = rnd(2.2, 5.5); }
-    if (!under && open > 0.62 && !env.zone && (wnd > 0.30 || (env.alt || 0) > 0.35) && (ev.gust -= dt) <= 0) {
-      play('gust', open * (0.14 + 0.26 * Math.max(wnd, env.alt || 0)), rnd(0.86, 1.14));
-      ev.gust = rnd(5.5, 13.5);
+    // Rajada só com vento a partir de ~4,5 m/s; mais vento, mais frequente e mais forte.
+    if (!under && open > 0.62 && !env.zone && ar > 0.27 && (ev.gust -= dt) <= 0) {
+      play('gust', open * (0.12 + 0.28 * ar) * (1 + 0.5 * (env.alt || 0)), rnd(0.86, 1.14));
+      ev.gust = rnd(5.5, 13.5) / (0.6 + ar);
     }
     if (!under && !env.zone && env.dripPos && (ev.drip -= dt) <= 0) { drip(amb, env.dripPos); ev.drip = rnd(2.2, 8.5); }
     if (env.zone && (ev.whisper -= dt) <= 0) { whisper(amb); ev.whisper = rnd(4, 13); }

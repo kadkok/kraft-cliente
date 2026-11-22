@@ -2,11 +2,11 @@
 // criar esfera-ambiente e editar tamanho/rotação/material de qualquer objeto.
 
 import * as THREE from '../three.js';
-import { BLOCKS, KIND, K_AIR, B } from '../../shared/blocks.js';
+import { BLOCKS, KIND, K_AIR, B, REPLACEABLE } from '../../shared/blocks.js';
 import { h } from '../ui/ui.js';
 import { createObjects, OF_SOLID, OF_UNLIT, OF_INSIDE, OF_HOLLOW, OF_MESH } from './objects.js';
-import { SHAPES, PAINEL_ESPESSURA } from './shapes.js';
-import { ORIENT_LABEL } from './sizing.js';
+import { SHAPES, PAINEL_ESPESSURA, shapeGeometry } from './shapes.js';
+import { ORIENT_LABEL, stepSize, mainSize, shapePlaceQuat, faceAnchor, mockupHold } from './sizing.js';
 import { initMao } from './mao.js';   // pegar, levar e soltar peças; pôr no ar; ímã; conjuntos; pré-formas (20/11)
 
 const r2 = (v) => Math.round(v * 100) / 100;
@@ -105,9 +105,8 @@ export function initObjects(ctx) {
         objects.update(forEntry.o.id, part);
         refreshPanel();
       } else {
-        const wide = 3;
-        objects.create({ s: 'painel', p: inFront(3, 1.5), q: yawQuat(player.yaw), k: [wide, r2(wide * img.h / img.w), 0.05], m: { t: 'i', i: id }, f: OF_SOLID });
-        ui.toast('Imagem colocada. Mire nela e aperte F para ajustar o tamanho.');
+        const wide = 2;
+        beginImageCarry(id, [wide, r2(wide * img.h / img.w), 0.05]);   // a imagem segue a mira até o clique (ramo exp/imagem-mockup, 20/11)
       }
     } catch (e) { ui.toast('Não consegui importar a imagem: ' + (e.message || e), 6000); }
   }
@@ -302,10 +301,91 @@ export function initObjects(ctx) {
   });
   game.hooks.frame.push((dt) => {
     mao.frame();                // com forma escolhida ou peça na mão, as teclas mudam de papel (input.shapeMode)
+    if (game.tool && game.tool.type === 'image') input.shapeMode = true;   // imagem na mira: R/F mudam o tamanho
     objects.frame(dt);
     atmosphere.state.envInside = !!objects.inside;
     if (cur && panel.classList.contains('hide') === false) showSel(cur);
   });
+
+  // ---- imagem na mira (ramo exp/imagem-mockup, 20/11; portado para a estrutura do mao.js em 22/11) -------------
+  // Importada a imagem, ela segue a mira encostada no que se olha: R/F mudam o tamanho, o clique posiciona e segurar
+  // o clique sobre a mesma face de um bloco por MOCKUP_HOLD a encosta no centro daquela face (mockup). B/ferramenta
+  // cancela. O mao.js só cuida de ferramenta do tipo 'shape'; a imagem é tratada aqui, antes dele.
+  const imgGhost = new THREE.Mesh(shapeGeometry('painel'), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.94, depthWrite: false, side: THREE.DoubleSide }));
+  imgGhost.visible = false; imgGhost.renderOrder = 7; scene.add(imgGhost);
+  let carry = { down: false, key: null, t: 0 };
+  const MOCKUP_HOLD = 0.55;
+  const fmtM = (v) => (v >= 10 ? Math.round(v) : Math.round(v * 100) / 100).toString().replace('.', ',');
+  const ivq = new THREE.Quaternion(), iax = new THREE.Vector3();
+  function endCarry() {
+    const map = imgGhost.material.map;
+    imgGhost.material.map = null; imgGhost.material.color.set(0xffffff);
+    if (map) map.dispose();
+    imgGhost.visible = false;
+    carry = { down: false, key: null, t: 0 };
+    if (game.tool && game.tool.type === 'image') game.tool = null;
+  }
+  function beginImageCarry(id, k) {
+    endCarry();
+    game.tool = { type: 'image', id, k: [...k] };
+    const url = game.localFiles.get(id) || `f/${encodeURIComponent(game.slug)}/${id}`;
+    new THREE.TextureLoader().load(url, (t) => {
+      if (!game.tool || game.tool.type !== 'image' || game.tool.id !== id) { t.dispose(); return; }
+      t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+      imgGhost.material.map = t; imgGhost.material.needsUpdate = true;
+    });
+    ui.toast('Imagem na mira. R aumenta, F diminui. Clique posiciona. Segure sobre um bloco para virar mockup.', 6500);
+  }
+  function poseOn(pt, n, k) {
+    const flat = Math.abs(n[1]) >= 0.7;
+    const pq = shapePlaceQuat('painel', player.yaw, n, 0, flat ? 'h' : 'v');
+    ivq.set(pq[0], pq[1], pq[2], pq[3]);
+    let ext = 0;
+    const kk = [k[0], k[1], 0.06];
+    for (let i = 0; i < 3; i++) {
+      iax.set(i === 0 ? 1 : 0, i === 1 ? 1 : 0, i === 2 ? 1 : 0).applyQuaternion(ivq);
+      ext += Math.abs(iax.x * n[0] + iax.y * n[1] + iax.z * n[2]) * kk[i] / 2;
+    }
+    return { p: [snap(pt[0] + n[0] * ext), snap(pt[1] + n[1] * ext), snap(pt[2] + n[2] * ext)], q: [ivq.x, ivq.y, ivq.z, ivq.w] };
+  }
+  const dropImage = (p, q, k, id) => objects.create({ s: 'painel', p, q, k: [...k], m: { t: 'i', i: id }, f: OF_SOLID });
+  function carryImage(dt, playing, o, d) {
+    const tool = game.tool;
+    if (input.wasPressed('tool')) { endCarry(); return true; }
+    let mudou = false;
+    if (input.wasPressed('grow')) { tool.k = stepSize(tool.k, +1, true); mudou = true; }
+    if (input.wasPressed('shrink')) { tool.k = stepSize(tool.k, -1, true); mudou = true; }
+    if (mudou) game.audio?.play('tick', 0.6, 1.1);
+    const vox = interaction.target, tree = game.treeAim;
+    let pt = null, n = null;
+    if (tree && (!vox.hit || tree.t < vox.t)) { pt = tree.point; n = tree.normal; }
+    else if (vox.hit) { pt = [o[0] + d[0] * vox.t, o[1] + d[1] * vox.t, o[2] + d[2] * vox.t]; n = [vox.nx, vox.ny, vox.nz]; }
+    let pose;
+    if (pt && n) pose = poseOn(pt, n, tool.k);
+    else { const q = yawQuat(player.yaw); pose = { p: inFront(3, 1.4), q }; ivq.set(q[0], q[1], q[2], q[3]); }
+    imgGhost.visible = true;
+    imgGhost.position.set(pose.p[0], pose.p[1], pose.p[2]);
+    imgGhost.quaternion.copy(ivq);
+    imgGhost.scale.set(tool.k[0], tool.k[1], 1);
+    const noBloco = vox.hit && vox.id && !REPLACEABLE[vox.id] && !(tree && tree.t < vox.t);
+    const faceKey = noBloco ? `${vox.x},${vox.y},${vox.z},${vox.nx},${vox.ny},${vox.nz}` : null;
+    const next = mockupHold(carry, { down: !!(playing && input.isDown('place')), faceKey, dt, hold: MOCKUP_HOLD });
+    carry = { down: next.down, key: next.key, t: next.t };
+    imgGhost.material.color.set(next.t > 0 ? 0xffe2b0 : 0xffffff);
+    if (playing && next.commit === 'mockup' && faceKey) {
+      const [x, y, z, nx, ny, nz] = faceKey.split(',').map(Number);
+      const flat = Math.abs(ny) >= 0.7;
+      dropImage(faceAnchor(x, y, z, nx, ny, nz).map(snap), shapePlaceQuat('painel', player.yaw, [nx, ny, nz], 0, flat ? 'h' : 'v'), tool.k, tool.id);
+      ui.toast('A imagem virou mockup neste bloco.');
+      endCarry();
+    } else if (playing && next.commit === 'place') {
+      dropImage(pose.p, pose.q, tool.k, tool.id);
+      ui.toast('Imagem posicionada.');
+      endCarry();
+    } else if (next.t > 0) ui.setHint(`Mockup neste bloco… ${Math.min(100, Math.round(next.t / MOCKUP_HOLD * 100))}%`);
+    else ui.setHint(`Imagem ${fmtM(mainSize(tool.k, true))} m · R/F tamanho · clique posiciona · segure sobre um bloco para mockup`);
+    return true;
+  }
 
   // A mira sobre os objetos: editar (F), apagar (quebrar), pôr bloco encostado, pegar e levar (Q), pôr forma nova
   // (apoiada ou no ar), ímã, conjuntos e pré-formas — tudo em objects/mao.js.
@@ -316,6 +396,7 @@ export function initObjects(ctx) {
   });
   game.hooks.interact.push((dt, playing, o, d) => {
     if (game.overlay === 'editor') return true;
+    if (game.tool && game.tool.type === 'image') return carryImage(dt, playing, o, d);
     return mao.interact(dt, playing, o, d);
   });
 
