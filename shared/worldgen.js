@@ -840,7 +840,7 @@ export function createWorldGen(seed, dim = 0, opt = null) {
     }
     return out;
   }
-  return { seed, fundo: Y_MIN, generate, height, heightRel, arq, fortaleza, biomeAt, climateGrid, lapse, findSpawn, treeAt, treesNear, coqueiros, rioEm, topoEm };
+  return { seed, fundo: Y_MIN, generate, height, heightRel, arq, fortaleza, origemFortaleza: !!(fortaleza && opt.origemFortaleza), biomeAt, climateGrid, lapse, findSpawn, treeAt, treesNear, coqueiros, rioEm, topoEm };
 
 }
 

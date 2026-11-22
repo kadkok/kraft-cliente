@@ -2,10 +2,32 @@
 import { PALACIO, GELEIRA } from './fortaleza-obra.js';
 import { B } from './blocks.js';
 import { SEA, Y_MIN } from './constants.js';
+import { RAIO_BANQUISA, BANQUISA } from './fortaleza-banquisa.js';
 
 export const ORIGEM_FORTALEZA = Object.freeze([-235, -430]);
 export const ALTO_MAR = Object.freeze([10500, -10500]);
 export const RAIO_GELO = 50;
+// Mudança de lugar por inteiro (pedido do Kadmus, 22/11/2026: "a ilha não foi movida na íntegra, ficou uma parte de
+// gelo pra trás, com um corte reto"). Antes só um círculo de 50 m do mar congelado saía da origem antiga e a banquisa
+// natural em volta ficava, recortada. Agora, no mundo que mudou a fortaleza de lugar (origemAntiga): na origem antiga
+// todo gelo do nível do mar a até RAIO_LIMPEZA vira mar (o anel de 290 a 339 m não tem gelo nenhum: o corte não
+// aparece), e a mesma banquisa (fortaleza-banquisa.js, o molde tirado do gerador) aparece em volta do centro novo,
+// na mesma posição em relação ao palácio, só onde ali é mar.
+export const RAIO_LIMPEZA = 315;
+let banquisa;
+function lerBanquisa() {
+  if (banquisa) return banquisa;
+  const bin = atob(BANQUISA), linhas = new Map();
+  for (let i = 0; i + 5 < bin.length; i += 6) {
+    const u = (k) => bin.charCodeAt(i + k) | (bin.charCodeAt(i + k + 1) << 8);
+    const dz = u(0) - RAIO_BANQUISA, dx0 = u(2) - RAIO_BANQUISA, n = u(4);
+    let l = linhas.get(dz);
+    if (!l) { l = []; linhas.set(dz, l); }
+    l.push(dx0, n);
+  }
+  banquisa = linhas;
+  return banquisa;
+}
 let planta;
 function lerPlanta() {
   if (planta) return planta;
@@ -34,6 +56,12 @@ function lerPlanta() {
   }
   planta = { colunas, antigos };
   return planta;
+}
+// o molde inteiro como imagem (lado 2·RAIO_BANQUISA + 1, 1 = gelo), para a superfície do mar não cobrir a banquisa
+export function mascaraBanquisa() {
+  const N = 2 * RAIO_BANQUISA + 1, dados = new Uint8Array(N * N);
+  for (const [dz, l] of lerBanquisa()) for (let k = 0; k < l.length; k += 2) dados.fill(255, (dz + RAIO_BANQUISA) * N + l[k] + RAIO_BANQUISA, (dz + RAIO_BANQUISA) * N + l[k] + RAIO_BANQUISA + l[k + 1]);
+  return { raio: RAIO_BANQUISA, lado: N, dados };
 }
 export function edicoesDoPalacio() {
   return lerPlanta().antigos;
@@ -82,22 +110,29 @@ export function oceanoLivre(gen, c, obras) {
 }
 export function imprimirFortaleza(vox, x0, z0, centro, maxY, origemAntiga) {
   if (!centro) return maxY;
-  function perto(c) {
-    return (
-      x0 <= c[0] + RAIO_GELO &&
-      x0 + 15 >= c[0] - RAIO_GELO &&
-      z0 <= c[1] + RAIO_GELO &&
-      z0 + 15 >= c[1] - RAIO_GELO
-    );
+  function perto(c, r = RAIO_GELO) {
+    return x0 <= c[0] + r && x0 + 15 >= c[0] - r && z0 <= c[1] + r && z0 + 15 >= c[1] - r;
   }
-  const origem = ORIGEM_FORTALEZA;
-  if (origemAntiga && perto(origem)) {
+  const origem = ORIGEM_FORTALEZA, mar = (SEA - Y_MIN) * 256;
+  if (origemAntiga && perto(origem, RAIO_LIMPEZA)) {
     for (let z = 0; z < 16; z++)
       for (let x = 0; x < 16; x++) {
-        if (!naGeleira(origem, x0 + x, z0 + z)) continue;
-        const i = x + 16 * z + (SEA - Y_MIN) * 256;
+        const dx = x0 + x - origem[0], dz = z0 + z - origem[1];
+        if (dx * dx + dz * dz > RAIO_LIMPEZA * RAIO_LIMPEZA) continue;
+        const i = x + 16 * z + mar;
         if (vox[i] === B.ICE) vox[i] = B.WATER;
       }
+  }
+  if (origemAntiga && perto(centro, RAIO_BANQUISA)) {
+    const linhas = lerBanquisa();
+    for (let z = 0; z < 16; z++) {
+      const l = linhas.get(z0 + z - centro[1]);
+      if (!l) continue;
+      for (let k = 0; k < l.length; k += 2) {
+        const a = Math.max(x0, centro[0] + l[k]), b = Math.min(x0 + 15, centro[0] + l[k] + l[k + 1] - 1);
+        for (let wx = a; wx <= b; wx++) { const i = wx - x0 + 16 * z + mar; if (vox[i] === B.WATER) vox[i] = B.ICE; }
+      }
+    }
   }
   if (!perto(centro)) return maxY;
   for (let z = 0; z < 16; z++)

@@ -16,13 +16,23 @@
 // Para os outros sistemas: game.mar = { ligado, altura(x, z) → y da superfície agora, prof(x, z), s(x, z), tempo }.
 import * as THREE from '../three.js';
 import { U, COMMON } from './materials.js';
-import { RAIO_GELO } from '../../shared/fortaleza.js';
+import { RAIO_GELO, mascaraBanquisa } from '../../shared/fortaleza.js';
+import { RAIO_BANQUISA } from '../../shared/fortaleza-banquisa.js';
 import { mascaraNaMare } from '../../shared/ferrovia-terreno.js';
 import { MAR_GLSL, MAR_NIVEL, alturaMar, estadoDoTempo, multMar } from '../../shared/mar.js';
 import { B } from '../../shared/blocks.js';
 import { CW } from '../../shared/constants.js';
 
 const CAMERA_FAR = 6800;
+// textura do molde da banquisa (uma vez): R8, 1 texel por bloco, centrada no centro da Fortaleza
+let banquisaTex = null;
+function texturaBanquisa() {
+  if (banquisaTex) return banquisaTex;
+  const m = mascaraBanquisa();
+  banquisaTex = new THREE.DataTexture(m.dados, m.lado, m.lado, THREE.RedFormat);
+  banquisaTex.needsUpdate = true;
+  return banquisaTex;
+}
 const MAR_DISTANCIA_REAL = 4800;
 const MAR_HORIZONTE = 6400;
 const LONGE = 60000;          // raio virtual do último anel
@@ -287,7 +297,8 @@ uniform vec4 uMarCaixa;
 uniform vec3 uWaterColor, uWaterShallow;
 in vec3 vVirt;
 uniform sampler2D uGaleria;
-uniform vec3 uGaleriaCaixa, uGeleira;
+uniform vec3 uGaleriaCaixa, uGeleira, uBanquisa;
+uniform sampler2D uBanquisaMapa;
 uniform ivec2 uOrigemChunks;
 uniform sampler2D uChunksComMalha;
 out vec4 outColor;
@@ -306,6 +317,17 @@ void main() {
   if (uGeleira.z > 0.0) {
     vec2 dxz = floor(P.xz) - uGeleira.xy;
     if (dot(dxz, dxz) <= uGeleira.z) {
+      ivec2 ch = ivec2(floor(P.xz / 16.0)) - uOrigemChunks;
+      if (all(greaterThanEqual(ch, ivec2(0))) && all(lessThan(ch, textureSize(uChunksComMalha, 0)))
+          && texelFetch(uChunksComMalha, ch, 0).r > 0.0) discard;
+    }
+  }
+  // banquisa que veio com a Fortaleza (shared/fortaleza.js, o mesmo molde do gerador): onde há gelo, o mar não passa
+  // por cima (antes as ondas cobriam o gelo em manchas e degraus de 16 m fora do círculo da geleira)
+  if (uBanquisa.z > 0.0) {
+    ivec2 q = ivec2(floor(P.xz) - uBanquisa.xy) + ivec2(int(uBanquisa.z));
+    ivec2 lb = textureSize(uBanquisaMapa, 0);
+    if (all(greaterThanEqual(q, ivec2(0))) && all(lessThan(q, lb)) && texelFetch(uBanquisaMapa, q, 0).r > 0.0) {
       ivec2 ch = ivec2(floor(P.xz / 16.0)) - uOrigemChunks;
       if (all(greaterThanEqual(ch, ivec2(0))) && all(lessThan(ch, textureSize(uChunksComMalha, 0)))
           && texelFetch(uChunksComMalha, ch, 0).r > 0.0) discard;
@@ -427,6 +449,7 @@ export function initOceano({ scene, camera, game, world }) {
   const uniforms = {
     ...U,
     uOrigemChunks, uChunksComMalha, uGeleira: { value: new THREE.Vector3() },
+    uBanquisa: { value: new THREE.Vector3() }, uBanquisaMapa: { value: texturaBanquisa() },
     uGaleria: {value: texturaGaleria}, uGaleriaCaixa: {value: new THREE.Vector3()},
     uMarCentro: { value: new THREE.Vector3() },
     uMarVento: { value: new THREE.Vector3(0.83, 0.55, 0.85) },
@@ -523,6 +546,7 @@ export function initOceano({ scene, camera, game, world }) {
     const gelo = gen.fortaleza;
     const pertoDoGelo = gelo && Math.abs(c.x - gelo[0]) < 700 && Math.abs(c.z - gelo[1]) < 700;
     uniforms.uGeleira.value.set(gelo?.[0] ?? 0, gelo?.[1] ?? 0, pertoDoGelo ? RAIO_GELO ** 2 : 0);
+    uniforms.uBanquisa.value.set(gelo?.[0] ?? 0, gelo?.[1] ?? 0, pertoDoGelo && gen.origemFortaleza ? RAIO_BANQUISA : 0);
     atualizarChunks(c.x, c.z);
     const corredores = game.ferrovia?.corredores;
     if (corredores?.size || indiceGaleria) {

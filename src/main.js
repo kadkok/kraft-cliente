@@ -1139,7 +1139,9 @@ function frameGame(dt, alpha) {
         game.audio.play(player.headInWater ? 'uw_swim' : 'swim', 0.8, 0.85 + Math.random() * 0.3, 'water');
       }
     }
-    world.update(player.pos[0], player.pos[2]);
+    // voo alto (mais de 300 m sobre o mar, game/player.js → multVoo): a vista orbital esconde o chão e a velocidade passa
+    // de centenas de m/s; não monta pedaços que ninguém vai ver (poupa a CPU). Ao descer, volta a carregar onde se está.
+    if (!(player.flying && player.pos[1] - SEA > 300)) world.update(player.pos[0], player.pos[2]);
     net.sendState(performance.now(), player.pos, player.yaw, player.pitch, game.hotbar[game.sel] || 0, (player.flying ? 1 : 0) | (xr ? 2 : 0) | (player.sneaking ? 8 : 0), game.garagem?.pose);
   }
 
