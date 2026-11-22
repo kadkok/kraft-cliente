@@ -65,6 +65,17 @@ export function initMapa({ game, world, player, avatars, net, openOverlay, close
   document.body.appendChild(tela);
   const ctx = cv.getContext('2d');
   const ferroviario = editorFerrovia({game,tela,topo,st});
+  const moverFortaleza=fecharBtn.cloneNode(false);
+  moverFortaleza.style.marginLeft='0';
+  let escolhendoMar=false;
+  function selecionarMar(ativo) {
+    escolhendoMar=ativo;
+    moverFortaleza.textContent=ativo ? 'Toque no mar para mover · Cancelar' : 'Mover fortaleza';
+    moverFortaleza.setAttribute('aria-pressed',String(ativo));
+  }
+  selecionarMar(false);
+  moverFortaleza.addEventListener('click',()=>{ ferroviario.fechar(); selecionarMar(!escolhendoMar); });
+  topo.insertBefore(moverFortaleza,fecharBtn);
 
   // ---- cor de um ponto -------------------------------------------------------------------------------------------
   function amostra(x, z) {          // → [r, g, b, altura]
@@ -153,6 +164,8 @@ export function initMapa({ game, world, player, avatars, net, openOverlay, close
         marca(m.x, m.z, m.icone || (m.kind === 'vila' ? '⚓' : '🚤'), m.nome || '', m.cor || '#d8f4ff');
       }
     }
+    const gelo=game.gen?.fortaleza;
+    if (gelo) marca(gelo[0],gelo[1],'❄','Fortaleza da Solidão');
     const campo = game.futebol?.campo; if (campo) marca(campo.centro[0], campo.centro[2], '⚽', 'campo');
     for (const [tipo, x, z] of st.descobrir) marca(x, z, '❔', tipo + ' a descobrir', '#cfe3ff');
     for (const [tipo, nome, x, z] of st.povos) marca(x, z, tipo === 'tribo' ? '⛺' : tipo === 'aldeia' ? '🏘' : '🏰', nome, '#ffe9c2');
@@ -254,7 +267,12 @@ export function initMapa({ game, world, player, avatars, net, openOverlay, close
   salvar.addEventListener('click', (e) => { e.stopPropagation(); envia(); });
   campoNome.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') envia(); else if (e.key === 'Escape') fechaCaixa(); });
   function clique(mx, my) {
-    if (ferroviario.clicar(mx, my)) { fechaCaixa(); return; }
+    if (ferroviario.clicar(mx, my)) { selecionarMar(false); fechaCaixa(); return; }
+    if (escolhendoMar && (net.offline || game.gmFortaleza)) {
+      selecionarMar(false);
+      const x=Math.round(st.cx+(mx-st.w/2)*st.esc),z=Math.round(st.cz+(my-st.h/2)*st.esc);
+      game.comandoFortaleza('/fortaleza mover '+x+' '+z); return;
+    }
     const W = st.w, H = st.h, px = (x) => W / 2 + (x - st.cx) / st.esc, pz = (z) => H / 2 + (z - st.cz) / st.esc;
     const raio = device?.touch ? 30 : 22;
     const o = st.obras.map((k) => ({ k, d: Math.hypot(px(k[2]) - mx, pz(k[3]) - my) })).filter((q) => q.d < raio).sort((a, b) => a.d - b.d)[0];
@@ -267,6 +285,8 @@ export function initMapa({ game, world, player, avatars, net, openOverlay, close
 
   function abre() {
     if (st.aberto || game.state !== 'PLAYING' || game.overlay) return;
+    selecionarMar(false);
+    moverFortaleza.hidden=!(game.gen?.fortaleza && (net.offline || game.gmFortaleza));
     st.aberto = true; st.cx = player.pos[0]; st.cz = player.pos[2];
     for (const [k, L] of st.ladrilhos) if (Math.abs(L.tx * T * L.esc - st.cx) < 400 && Math.abs(L.tz * T * L.esc - st.cz) < 400) st.ladrilhos.delete(k);   // perto de você redesenha (o mundo muda)
     st.fila = st.fila.filter((L) => st.ladrilhos.has(L.k));

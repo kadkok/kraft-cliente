@@ -56,6 +56,8 @@ import { createAudio } from './audio/audio.js';
 import { waveEnergyOfWind, classifyCoastalStepMaterial } from './audio/physics.js';
 import { createPlayer } from './game/player.js';
 import { createInteraction } from './game/interaction.js';
+import { comandoSolo as comandoFortalezaSolo, posicaoSolo as posicaoFortalezaSolo } from './game/fortaleza.js';
+import { blocoDaFortaleza, dentroDoPalacio, foraDoPalacio, naGeleira } from '../shared/fortaleza.js';
 import { initGroups } from './game/groups.js';
 import { initItems } from './game/items.js';
 import { initBaus } from './game/baus.js';     // baús com tesouros (server/baus.js)
@@ -278,7 +280,7 @@ const net = createNet({
         if (pos) store.set('off.pos.' + slug, pos);
       }
     }
-    if (terreno === 'ilhas') startWorld(sementeArquipelago, 0, { mapa: mapaSolo });
+    if (terreno === 'ilhas') startWorld(sementeArquipelago, 0, { mapa: mapaSolo, fortaleza: posicaoFortalezaSolo(store,slug) });
     else startWorld(seedFromString('lavra:' + slug));
     world.loadEdits(store.get('off.' + slug, {}));
     world.loadMinis(store.get('off.minis.' + slug, {}));
@@ -292,6 +294,11 @@ const net = createNet({
   clock(rate) { if (ui) ui.setTimeRate(rate); },
   other(m) {
     if (m.t === 'dim') return switchDimension(m);
+    if (m.t === 'gm') game.gmFortaleza = !!m.isGm;
+    if (m.t === 'fortaleza-voltar' && m.p) {
+      player.teleport(...m.p); game.pendingSpawn=false;
+      ui.toast('A entrada no palácio é exclusiva do GM. Você pode visitar a geleira.',4500); return;
+    }
     for (const f of game.hooks.other) f(m);
   },
 });
@@ -307,10 +314,19 @@ game.audio.setWorld({
   isWater: (id) => id > 0 && LEVEL[id] > 0,
   isSolid: (id) => id > 0 && SOLID[id] === 1,
 });
+game.comandoFortaleza = texto => net.offline
+  ? comandoFortalezaSolo(texto,{game,world,store,player,ui,startWorld,mapa:mapaSolo})
+  : net.chat(texto);
 const interaction = createInteraction({
   world, player,
   canEdit: (x, y, z) => (game.futebol ? game.futebol.podeEditarBloco(x, y, z) : true),
   beforeBreak:(x,y,z)=>game.trees?.cutBlock(x,y,z)||false,
+  tentativaProtegida: ({x,y,z,id}) => {
+    const c=game.gen?.fortaleza;
+    if (net.offline || game.gmFortaleza || !naGeleira(c,x,z) || y<40 || y>159 || !id || LEVEL[id]) return false;
+    if (!blocoDaFortaleza(c,x,y,z) && !world.isEdited(x,y,z)) return false;
+    net.send({t:'fortaleza-tocar',x,y,z}); return true;
+  },
   // com servidor, é ele quem aplica as leis (queda e colapso estrutural); offline, este aparelho aplica
   send: (x, y, z, id, m = 0) => {
     net.sendBlock(x, y, z, id, m);
@@ -412,6 +428,9 @@ const ui = createUI({
     hotbar(i) { if (i !== game.sel) game.audio.play('tick', 1, 1); game.sel = i; ui.setHotbar(game.hotbar, game.sel); },
     chatOpen(prefix) { if (game.state === 'PLAYING') { openOverlay('chat'); ui.chatOpen(prefix); } },
     chatSend(text) {
+      if (net.offline && /^\/fortaleza(?:\s|$)/i.test(text)) {
+        game.comandoFortaleza(text); closeOverlay(); return;
+      }
       const k = text === '/nano' ? 'nano' : text === '/macro' ? 'macro' : text === '/normal' ? 'normal' : '';
       // /inicio: volta ao ponto do primeiro nascimento neste mundo (o mesmo cálculo da primeira entrada, sem a posição salva)
       if (text === '/inicio') {
@@ -588,6 +607,7 @@ addEventListener('beforeunload', (e) => {
 // ---- mundo ---------------------------------------------------------------------------------
 function startWorld(seed, dim = 0, opt = null) {
   game.seed = seed >>> 0;
+  game.foraDoSalao = null;
   game.dim = dim;
   game.gen = createWorldGen(game.seed, dim, opt);
   game.spawn = game.gen.findSpawn();
@@ -607,7 +627,7 @@ function switchDimension(m) {
   for (const p of m.players || []) if (p.id !== net.id) { avatars.add(p); game.players.set(p.id, p); }
   for (const f of game.hooks.other) f({ ...m, t: 'welcome' });
   player.flying = false;
-  if (m.p) player.teleport(m.p[0], m.p[1] + 0.05, m.p[2]);
+  if (m.p) { player.teleport(m.p[0], m.p[1] + 0.05, m.p[2]); game.pendingSpawn=false; }
   else game.pendingSpawn = true;                       // sem ponto marcado: nasce no ponto de partida da dimensão
   if ((d === 1 || prevDim === 1) && game.audio) game.audio.play('portal', 0.85, 1);
   ui.toast(d === 1 ? 'Você atravessou o véu. Esta é a Zona Fantasma.'
@@ -631,6 +651,7 @@ function connect(slug) {
   }
   salvarSolo();
   game.ready = false;
+  game.gmFortaleza = false;
   for (const f of game.hooks.other) f({ t: 'gm', isGm: false, ativo: false });
   ui.setStatus('Abrindo o mundo…');
   net.connect(slug, ui.menuValues().partida);
@@ -919,6 +940,19 @@ function frameInput(dt) {
 }
 
 function frameGame(dt, alpha) {
+  const centro = game.gen?.fortaleza;
+  if (centro && net.online && !game.gmFortaleza && game.state === 'PLAYING') {
+    const p=player.pos;
+    if (dentroDoPalacio(centro,p)) {
+      player.teleport(...(game.foraDoSalao || foraDoPalacio(centro)));
+      if (!game.avisoSalao || performance.now()-game.avisoSalao>2000) {
+        ui.toast('A entrada no palácio é exclusiva do GM. Você pode visitar a geleira.',3500);
+        game.avisoSalao=performance.now();
+      }
+    } else if (naGeleira(centro,p[0],p[2])) {
+      const fora=game.foraDoSalao ||= [0,0,0]; fora[0]=p[0]; fora[1]=p[1]; fora[2]=p[2];
+    } else game.foraDoSalao=null;
+  }
   const playing = game.state === 'PLAYING' && !game.overlay;
   const xr = game.xr && game.xr.presenting;
   player.eye(alpha, eye);

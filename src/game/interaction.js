@@ -30,7 +30,7 @@ export function orientBlock(base, look, nx, ny, nz) {
   }
 }
 
-export function createInteraction({ world, player, send, onBreak, onPlace, onDig, canEdit, beforeBreak }) {
+export function createInteraction({ world, player, send, onBreak, onPlace, onDig, canEdit, beforeBreak, tentativaProtegida }) {
   const hit = { hit: false, x: 0, y: 0, z: 0, nx: 0, ny: 0, nz: 0, fx: 0, fy: 0, fz: 0, t: 0, id: 0 };
   // menor y que se edita: logo acima da rocha-mãe do fundo do plano (world.js; 1 fora do plano de cima, −63 nele)
   const piso = () => (Number.isFinite(world.fundo) ? world.fundo : 0) + 1;
@@ -63,6 +63,7 @@ export function createInteraction({ world, player, send, onBreak, onPlace, onDig
     },
 
     breakTarget() {
+      if (hit.hit && tentativaProtegida?.(hit)) return false;
       if (api.locked || !hit.hit || hit.id === B.BEDROCK) return false;
       if (canEdit && !canEdit(hit.x, hit.y, hit.z)) return false;
       const { x, y, z } = hit;
@@ -190,6 +191,9 @@ export function createInteraction({ world, player, send, onBreak, onPlace, onDig
     // input: breakHeld, breakPressed, placeHeld, placePressed
     update(dt, inp, item, look) {
       breakT -= dt; placeT -= dt;
+      if (hit.hit && (inp.breakPressed || (inp.breakHeld && breakT <= 0)) && tentativaProtegida?.(hit)) {
+        dig = null; api.digging = null; breakT = 0.35; return;
+      }
       if (api.locked) { dig = null; api.digging = null; return; }
       if (api.breakTime) {
         // sobrevivência: segura o botão no mesmo bloco pelo tempo dele; trocar de bloco ou soltar recomeça

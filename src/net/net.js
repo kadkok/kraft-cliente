@@ -7,6 +7,19 @@ import { createClock } from '../../shared/clock.js';
 export function createNet(on) {
   let ws = null, world = '', name = '', wantPlay = false, closedByUs = false;
   let retryMs = 800, retryTimer = 0, helloTimer = 0;
+  let aparelho = '', avatar = '';
+  function pedidoSpawn(nome) {
+    const chave = 'kraft.avatar.' + String(nome).trim().toLowerCase();
+    if (avatar !== chave) {
+      avatar = chave; aparelho = '';
+      try { aparelho = localStorage.getItem(chave) || ''; } catch {}
+      if (!/^[a-f0-9]{32}$/.test(aparelho)) {
+        aparelho = Array.from(crypto.getRandomValues(new Uint8Array(16)), b => b.toString(16).padStart(2, '0')).join('');
+        try { localStorage.setItem(chave, aparelho); } catch {}
+      }
+    }
+    return { t: 'spawn', name: nome, aparelho };
+  }
   const clock = createClock();  // online: acompanha o relógio do servidor; offline: é o próprio relógio do mundo
   // Versão do jogo com que esta página foi carregada. Página comum: a primeira que o servidor informar (ela acabou de
   // baixar os arquivos dele). Cliente instalado: a dos arquivos guardados no aparelho, que game/cliente.js informa por
@@ -52,7 +65,7 @@ export function createNet(on) {
     spawn(n) {
       name = n; wantPlay = true;
       if (api.offline) { api.playing = true; on.spawned(n || 'Viajante'); return; }
-      api.send({ t: 'spawn', name: n });
+      api.send(pedidoSpawn(n));
     },
     leaveGame() { wantPlay = false; api.playing = false; api.close(); },
     send(obj) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj)); },
@@ -140,7 +153,7 @@ export function createNet(on) {
         if (typeof m.tz === 'number') tzMin = m.tz;
         api.local = m.local || null;
         on.welcome(m);
-        if (wantPlay) api.send({ t: 'spawn', name }); // reconexão no meio do jogo
+        if (wantPlay) api.send(pedidoSpawn(name)); // reconexão no meio do jogo
         break;
       case 'spawned': api.playing = true; on.spawned(m.name); break;
       case 'time': api.setLocalTime(m.time, m.rate); break;

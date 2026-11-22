@@ -113,8 +113,20 @@ const semAspas = (etag) => String(etag || '').replace(/^W\//, '').replace(/^"|"$
 // sem aceitar o sufixo, o index.html nunca era guardado e o jogo não abria sem internet.
 const mesmaMarca = (etag, marca) => etag === marca || (etag.startsWith(marca) && /^-(zstd|gzip|br)$/.test(etag.slice(marca.length)));
 
+// Clientes instalados no endereço histórico conservam os mundos no mesmo armazenamento.
+async function guardarDaDistribuicao(c,p,reg) {
+  if (self.location.hostname !== 'kraft.k14.uk' || !/^\/(assets|audio|vendor)\//.test(p)) return false;
+  try {
+    const url = new URL('https://kadkok.github.io/kraft-cliente' + p);
+    url.searchParams.set('v',reg[0]);
+    const r = await fetch(url, { credentials:'omit', referrerPolicy:'no-referrer' });
+    return r.status === 200 && await guardar(c,p,r,reg);
+  } catch { return false; }
+}
+
 async function instalarArquivo(c, p, reg) {
   if (await c.match(chaveDe(p, reg[0]))) return true;
+  if (await guardarDaDistribuicao(c,p,reg)) return true;
   const r = await fetch(p, { cache: 'no-cache', credentials: 'same-origin' });
   if (r.status !== 200) return false;
   return guardar(c, p, r, reg);
@@ -148,6 +160,7 @@ async function responder(e, req, p) {
   const c = await caches.open(ARQUIVOS);
   const tem = await c.match(chaveDe(p, reg[0]));
   if (tem) return tem;
+  if (await guardarDaDistribuicao(c,p,reg)) return c.match(chaveDe(p,reg[0]));
   const res = await fetch(p, { cache: 'no-cache', credentials: 'same-origin' });
   // só guarda o que é mesmo o arquivo do manifesto: se o servidor já trocou de versão, a marca não bate e passa direto
   if (res.status === 200 && res.type === 'basic') {

@@ -2,6 +2,7 @@
 // Mesma semente => mesmo mundo em qualquer aparelho. Ver a regra de ouro em noise.js:
 // aqui só entram operações exatas (nada de sin/cos/pow).
 
+import { imprimirFortaleza, centroValido } from './fortaleza.js';
 import { plantTree, TREE_CELL, TREE_REACH } from './trees.js';
 import { CW, SEA, CHUNK_VOL, DIM_MACRO, DIM_NANO0, FRACTAL, Y_MIN, Y_TOP } from './constants.js';
 import { faixaDe as faixaFundo } from './minerios.js';
@@ -322,6 +323,7 @@ export function createWorldGen(seed, dim = 0, opt = null) {
   // Rocha-mãe antiga (y 0…2) pelo sorteio de antes: os veios de cima não entram onde ela ficava (ali nada mais muda).
   const eraRochaMae = (wx, y, wz) => y <= 0 || (y <= 2 && rand3(wx, y, wz, S_MISC) < (y === 1 ? 0.55 : 0.2));
 
+  const fortaleza = dim === 0 && centroValido(opt?.fortaleza) ? opt.fortaleza : null;
   function generate(cx, cz) {
     const vox = new Uint8Array(CHUNK_VOL);
     const x0 = cx * CW, z0 = cz * CW;
@@ -694,6 +696,7 @@ export function createWorldGen(seed, dim = 0, opt = null) {
       }
     }
 
+    if (fortaleza) maxY = imprimirFortaleza(vox, x0, z0, fortaleza, maxY, opt.origemFortaleza);
     return { vox, maxY, minY };
   }
 
@@ -773,7 +776,7 @@ export function createWorldGen(seed, dim = 0, opt = null) {
     }
     return out;
   }
-  return { seed, fundo: Y_MIN, generate, height, heightRel, arq, biomeAt, climateGrid, lapse, findSpawn, treeAt, treesNear, coqueiros, rioEm, topoEm };
+  return { seed, fundo: Y_MIN, generate, height, heightRel, arq, fortaleza, biomeAt, climateGrid, lapse, findSpawn, treeAt, treesNear, coqueiros, rioEm, topoEm };
 
 }
 

@@ -164,7 +164,8 @@ export function initCliente({ game, net, ui, device, settings, params }) {
   const cartao = ui.el.menu.querySelector('.card');
   const baixarMenu = h('button', { class: 'btn small', type: 'button', text: 'Baixar para jogar offline', onclick: () => baixarTudo() });
   const estadoMenu = h('p', { class: 'note', role: 'status' });
-  if (cartao) cartao.append(instalarMenu, baixarMenu, estadoMenu);
+  const baixarPC = h('a', { class: 'btn small', href: 'https://github.com/kadkok/kraft-cliente/releases/latest/download/Kraft-PC.zip', text: 'Baixar para Windows ou Linux' });
+  if (cartao) cartao.append(instalarMenu, baixarMenu, baixarPC, estadoMenu);
 
   // ---- pausa: "Este aparelho" ---------------------------------------------------------------
   const pendentes = new Set();
