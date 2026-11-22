@@ -79,9 +79,11 @@ import { initVulcao } from './game/vulcao.js';   // penacho de fumaça e clarão
 import { initIlhasProps } from './game/ilhas-props.js';   // modelos 3D (.glb Meshy) das ilhas, cais e bóias de canal
 import { mapaSolo, sementeArquipelago } from '../shared/mapa-solo.js';
 import { initFerrovia } from './game/ferrovia.js';
+import { initGaragem } from './game/veiculos-kids.js';
 import { initBalsa } from './game/balsa.js';   // balsas entre as ilhas do arquipélago (shared/balsa.js, server/balsa.js)
 import { initCosta } from './game/costa.js';   // costa Tidewater: vila costeira, píer/deck e barco 3D (shared/costa.js, server/costa.js)
 import { initMapa } from './game/mapa.js';   // mapa na tecla M   // aldeões das tribos, aldeias e cidades (server/povos.js)   // tela cheia + teclado travado: Ctrl+W não fecha o jogo   // bola de futebol, gol e placar (server/bola.js)
+import { initGm } from './game/gm.js';
 import { initHudNautico } from './game/hud-nautico.js';
 import { initVrDesempenho } from './game/vr-desempenho.js';   // regulador de desempenho no visor   // bússola dos jogadores (direção e distância dos outros)
 import { createNet } from './net/net.js';
@@ -250,7 +252,13 @@ const net = createNet({
     }
     refreshPlayers();
   },
-  state(list) { for (const s of list) if (s[0] !== net.id) avatars.push(s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7]); },
+  state(list) {
+    for (const s of list) if (s[0] !== net.id) {
+      avatars.push(s[0], s[1], s[2], s[3], s[4], s[5], s[6], s[7]);
+      if (s[8]) game.garagem?.receber(s[0], [s[1],s[2],s[3]], s[8]);
+      else game.garagem?.remover(s[0]);
+    }
+  },
   block(m) {
     // edição de outra pessoa: ouve-se de onde veio (as minhas já tocaram na hora do clique)
     if (m.by && m.by !== net.id && game.state === 'PLAYING') {
@@ -260,7 +268,7 @@ const net = createNet({
     }
     world.setBlock(m.x, m.y, m.z, m.id, m.m || 0);
   },
-  join(p) { if (p.id === net.id) return; avatars.add(p); game.players.set(p.id, p); refreshPlayers(); refreshStatus(); },
+  join(p) { if (p.id === net.id) return; if(p.veiculo) game.garagem?.receber(p.id,p.p,p.veiculo); avatars.add(p); game.players.set(p.id, p); refreshPlayers(); refreshStatus(); },
   leave(id) { avatars.remove(id); game.players.delete(id); refreshPlayers(); refreshStatus(); for (const f of game.hooks.other) f({ t: 'leave', id }); },
   chat(m) { ui.chatAdd(m.name, m.color, m.m, false); },
   sys(m) { ui.chatAdd('', '', m, true); },
@@ -428,6 +436,14 @@ const ui = createUI({
     hotbar(i) { if (i !== game.sel) game.audio.play('tick', 1, 1); game.sel = i; ui.setHotbar(game.hotbar, game.sel); },
     chatOpen(prefix) { if (game.state === 'PLAYING') { openOverlay('chat'); ui.chatOpen(prefix); } },
     chatSend(text) {
+      if (/^\/(garagem|veiculo)(?:\s|$)/i.test(text)) {
+        closeOverlay();
+        const arg=text.trim().split(/\s+/)[1]?.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+        if (!arg) game.garagem.abrir();
+        else if (arg==='sair') game.garagem.sair();
+        else game.garagem.chamar(arg === 'carro' ? 'jipe' : arg === 'heli' ? 'helicoptero' : arg);
+        return;
+      }
       if (net.offline && /^\/fortaleza(?:\s|$)/i.test(text)) {
         game.comandoFortaleza(text); closeOverlay(); return;
       }
@@ -517,10 +533,12 @@ initTelaCheia({ game, canvas, device });
 initPovos({ game, scene, camera, net });
 initBalsa({ game, scene, camera, net, player, ui, avatars });
 initFerrovia({ game, world, player, net, ui, input, scene });
+game.garagem = initGaragem({game,player,world,net,ui,scene,avatars,store,input,openOverlay,closeOverlay});
 initVulcao({ game, scene, camera });
 initIlhasProps({ game, scene, camera });
 initCidadeLonge({ game, scene, camera, world });
 initMapa({ game, world, player, avatars, net, openOverlay, closeOverlay, device });
+initGm({ game, net, ui, mapa: game.mapa });
 const hudNautico = initHudNautico({ game, world, player, avatars, getWind: () => U.uWind.value, getSeaInfo: () => place });
 game.hudNautico = hudNautico;
 initCosta({ game, world, player, net, ui, input, scene, camera, avatars });
@@ -627,6 +645,7 @@ function switchDimension(m) {
   for (const p of m.players || []) if (p.id !== net.id) { avatars.add(p); game.players.set(p.id, p); }
   for (const f of game.hooks.other) f({ ...m, t: 'welcome' });
   player.flying = false;
+  if (Number.isFinite(m.yaw)) player.yaw = m.yaw;
   if (m.p) { player.teleport(m.p[0], m.p[1] + 0.05, m.p[2]); game.pendingSpawn=false; }
   else game.pendingSpawn = true;                       // sem ponto marcado: nasce no ponto de partida da dimensão
   if ((d === 1 || prevDim === 1) && game.audio) game.audio.play('portal', 0.85, 1);
@@ -853,9 +872,7 @@ function frameAudio(dt, cam, under) {
   place.speed = game.state === 'PLAYING' ? Math.hypot(player.vel[0], player.vel[1], player.vel[2]) : 0;
   place.fallSpeed = (game.state === 'PLAYING' && !player.onGround && !player.flying && !player.inWater && player.vel[1] < -6) ? -player.vel[1] : 0;
   place.rain = game.weather?.rain || 0;
-  place.ventoMs = game.weather?.wind ? Math.hypot(game.weather.wind[0], game.weather.wind[1]) : 0;   // vento de verdade do mundo
-  place.wind = Math.min(1, place.ventoMs / 14);
-  place.baleiaDist = game.nature?.baleiaDist ?? Infinity;   // baleia de verdade mais perto (m)
+  place.wind = game.weather?.wind ? Math.min(1, Math.hypot(game.weather.wind[0], game.weather.wind[1]) / 14) : 0;
   place.waveEnergy = (game.dim === 0 || game.dim === DIM_MACRO) ? waveEnergyOfWind(U.uWind.value.z) : 0;
   const vx = game.state === 'PLAYING' ? player.vel[0] : 0, vy = game.state === 'PLAYING' ? player.vel[1] : 0, vz = game.state === 'PLAYING' ? player.vel[2] : 0;
   game.audio.listen(cam.x, cam.y, cam.z, game.state === 'MENU' ? rig.rotation.y : player.yaw, vx, vy, vz);
@@ -899,6 +916,7 @@ function frameInput(dt) {
 
   const emFutebol = game.espacoAtivo?.tipo === 'futebol';
   if (input.wasPressed('inventory')) {
+    if (game.garagem?.atual) return game.garagem.sair();
     if (game.costa?.usaTeclaE?.()) return;
     game.audio.play('open', 1, 1);
     if (emFutebol) return game.futebol?.abrirPainel('partida');
@@ -1017,10 +1035,11 @@ function frameGame(dt, alpha) {
     if (!xr) {
       rig.position.set(eye[0], eye[1] - EYE_H, eye[2]);
       rig.rotation.set(0, player.yaw, 0);
-      pivot.position.set(0, EYE_H, 0);
+      pivot.position.set(0, EYE_H + (game.view !== 1 && game.garagem?.atual?.tipo === 'balao' ? 2.5 : 0), 0);
       pivot.rotation.set(player.pitch, 0, 0);
       let want = game.view === 1 ? 4.2 : 0;
       if (game.camWant !== undefined) want = game.camWant;
+      if (game.garagem?.atual) want = game.view === 1 ? 0 : game.garagem.distanciaCamera;
       if (want > 0) {
         raycastVoxels(world.getBlock, eye[0], eye[1], eye[2], -look[0], -look[1], -look[2], want + 0.3, (id) => SOLID[id] === 1, camHit);
         if (camHit.hit) want = Math.max(0.3, camHit.t - 0.3);
@@ -1037,6 +1056,7 @@ function frameGame(dt, alpha) {
       self.head.rotation.x = -player.pitch;
       const sw = Math.sin(player.walked * 2.3) * Math.min(1, Math.hypot(player.vel[0], player.vel[2]) / 3.5) * 0.9;
       self.legL.rotation.x = sw; self.legR.rotation.x = -sw; self.armL.rotation.x = -sw * 0.8; self.armR.rotation.x = sw * 0.8;
+      if (game.garagem?.atual) game.garagem.posar(self, game.garagem.atual);
     }
     if (game.pendingSpawn && world.isLoaded(game.spawn.x, game.spawn.z)) { game.pendingSpawn = false; placePlayer(true); }
     // sons do corpo: passo orgânico no chão/água rasa/areia molhada/madeira, salto, queda e respiração realista
@@ -1120,7 +1140,7 @@ function frameGame(dt, alpha) {
       }
     }
     world.update(player.pos[0], player.pos[2]);
-    net.sendState(performance.now(), player.pos, player.yaw, player.pitch, game.hotbar[game.sel] || 0, (player.flying ? 1 : 0) | (xr ? 2 : 0) | (player.sneaking ? 8 : 0));
+    net.sendState(performance.now(), player.pos, player.yaw, player.pitch, game.hotbar[game.sel] || 0, (player.flying ? 1 : 0) | (xr ? 2 : 0) | (player.sneaking ? 8 : 0), game.garagem?.pose);
   }
 
   const camWorld = camera.getWorldPosition(menuCam);

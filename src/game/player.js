@@ -22,6 +22,7 @@ export function createPlayer(world) {
     onGround: false, inWater: false, headInWater: false, flying: false, sneaking: false,
     jumped: false, sprinting: false,
     noclip: false,          // espectador (game/modes.js): voa e atravessa os blocos
+    speedScale: 1,          // modo GM anda e voa mais rápido; os outros modos ficam em 1
     autoJump: false,
     walked: 0,              // distância andada no chão (som de passos)
     landed: 0,              // velocidade do último pouso (som), consumida por quem lê
@@ -87,14 +88,15 @@ export function createPlayer(world) {
     // frente = -Z na convenção da câmera; yaw gira em torno de Y
     const wx = intent.x * cos - intent.z * sin;
     const wz = -intent.x * sin - intent.z * cos;
-    let speed = p.flying ? (intent.sprint ? FLY_FAST : FLY) : p.inWater ? SWIM : p.sneaking ? SNEAK : intent.sprint ? SPRINT : WALK;
+    const escala = p.speedScale || 1;
+    let speed = (p.flying ? (intent.sprint ? FLY_FAST : FLY) : p.inWater ? SWIM : p.sneaking ? SNEAK : intent.sprint ? SPRINT : WALK) * escala;
     const k = p.flying ? 9 : p.onGround ? 14 : p.inWater ? 5 : 3.2;
     const a = Math.min(1, k * dt);
     vel[0] += (wx * speed - vel[0]) * a;
     vel[2] += (wz * speed - vel[2]) * a;
 
     if (p.flying) {
-      const vy = ((intent.jump ? 1 : 0) - (intent.sneak ? 1 : 0)) * (intent.sprint ? FLY_FAST * 0.6 : FLY * 0.8);
+      const vy = ((intent.jump ? 1 : 0) - (intent.sneak ? 1 : 0)) * (intent.sprint ? FLY_FAST * 0.6 : FLY * 0.8) * escala;
       vel[1] += (vy - vel[1]) * Math.min(1, 10 * dt);
     } else if (p.inWater) {
       vel[1] -= 7 * dt;
@@ -156,10 +158,11 @@ export function createPlayer(world) {
     p.flying = true;
     const sin = Math.sin(p.yaw), cos = Math.cos(p.yaw);
     const wx = intent.x * cos - intent.z * sin, wz = -intent.x * sin - intent.z * cos;
-    const speed = intent.sprint ? FLY_FAST : FLY, a = Math.min(1, 9 * dt);
+    const escala = p.speedScale || 1;
+    const speed = (intent.sprint ? FLY_FAST : FLY) * escala, a = Math.min(1, 9 * dt);
     vel[0] += (wx * speed - vel[0]) * a;
     vel[2] += (wz * speed - vel[2]) * a;
-    const vy = ((intent.jump ? 1 : 0) - (intent.sneak ? 1 : 0)) * (intent.sprint ? FLY_FAST * 0.6 : FLY * 0.8);
+    const vy = ((intent.jump ? 1 : 0) - (intent.sneak ? 1 : 0)) * (intent.sprint ? FLY_FAST * 0.6 : FLY * 0.8) * escala;
     vel[1] += (vy - vel[1]) * Math.min(1, 10 * dt);
     for (let i = 0; i < 3; i++) pos[i] += vel[i] * dt;
     if (pos[1] < fundoDoMundo() - 30) pos[1] = fundoDoMundo() - 30;

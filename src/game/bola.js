@@ -1044,6 +1044,7 @@ export function initBola({ game, net, scene, camera, player, ui, world, device, 
     } else if (e.code === 'KeyQ' && noCampoAtivo) {
       alternarCurva();
     } else if (e.code === 'KeyG' && !e.ctrlKey && !e.altKey && !e.metaKey && !input?.shapeMode && !game.machines?.seat && !estaLonge()) {
+      if (game.mode === 'gm') { if (e.shiftKey) abrirPainel('gm'); return; }
       if (e.shiftKey) {
         if (isGm && gmAtivo) abrirPainel('gm');
         else if (isGm) ui.toast('👑 Ative o Modo GM primeiro (tecla G) para abrir o Estúdio GM.', 2400);
@@ -1054,7 +1055,7 @@ export function initBola({ game, net, scene, camera, player, ui, world, device, 
         abrirPainel('partida');
       }
     } else if (e.code === 'KeyH' && !e.ctrlKey && !e.altKey && !e.metaKey && !input?.shapeMode && !estaLonge()) {
-      abrirPainel(isGm && gmAtivo ? 'gm' : 'partida');
+      abrirPainel(game.mode === 'gm' || (isGm && gmAtivo) ? 'gm' : 'partida');
     }
   });
   addEventListener('keyup', (e) => { if (e.code === 'KeyF') soltaAcao(); });
@@ -1153,16 +1154,17 @@ export function initBola({ game, net, scene, camera, player, ui, world, device, 
   }
 
   function atualizarBotoesGm() {
-    game.isGm = isGm;
-    game.gmAtivo = gmAtivo;
-    btnGmToggle.style.display = isGm ? 'inline-flex' : 'none';
+    const noModo = game.mode === 'gm';
+    game.isGm = isGm || noModo;
+    game.gmAtivo = gmAtivo || noModo;
+    btnGmToggle.style.display = isGm && !noModo ? 'inline-flex' : 'none';
     btnGmToggle.textContent = gmAtivo ? '👑 GM: ON' : '👑 GM: OFF';
     btnGmToggle.style.background = gmAtivo
       ? 'linear-gradient(180deg, rgba(224,142,28,.96), rgba(164,84,12,.94))'
       : 'linear-gradient(180deg, rgba(52,58,70,.92), rgba(28,32,40,.9))';
-    btnGmStudio.style.display = isGm && gmAtivo ? 'inline-flex' : 'none';
+    btnGmStudio.style.display = noModo || (isGm && gmAtivo) ? 'inline-flex' : 'none';
     lastLayoutKey = '';
-    if (gmAtivo) {
+    if (game.gmAtivo) {
       aplicarEstadoEspaco(false);
       levantarArquibancada(false);
     }

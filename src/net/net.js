@@ -84,12 +84,12 @@ export function createNet(on) {
       api.send({ t: 'c', m });
     },
     // chamado a cada quadro; envia no máximo NET_TICK_HZ vezes por segundo e só se mudou
-    sendState(now, p, yaw, pitch, held, flags) {
+    sendState(now, p, yaw, pitch, held, flags, veiculo = null) {
       if (!api.playing || api.offline || now - lastSend < 1000 / NET_TICK_HZ) return;
-      const s = `${p[0].toFixed(2)},${p[1].toFixed(2)},${p[2].toFixed(2)},${yaw.toFixed(2)},${pitch.toFixed(2)},${held},${flags}`;
+      const s = `${p[0].toFixed(2)},${p[1].toFixed(2)},${p[2].toFixed(2)},${yaw.toFixed(2)},${pitch.toFixed(2)},${held},${flags},${veiculo || ''}`;
       if (s === lastPos && now - lastSend < 1000) return;
       lastPos = s; lastSend = now;
-      api.send({ t: 'p', p: [p[0], p[1], p[2]], r: [yaw, pitch], h: held, f: flags });
+      api.send({ t: 'p', p: [p[0], p[1], p[2]], r: [yaw, pitch], h: held, f: flags, ...(veiculo ? {veiculo} : {}) });
     },
     time() { return clock.time(); },
     // o instante de verdade (UTC, em ms) a que a hora do mundo corresponde: é por ele que se calcula o céu

@@ -37,7 +37,7 @@ const COR_BLOCO = { [B.GRASS]: [92, 150, 68], [B.DIRT]: [128, 96, 64], [B.SAND]:
   [B.PLASTER_WHITE]: [236, 232, 222], [B.LAMP]: [255, 226, 150], [B.BASALT]: [60, 60, 66] };
 
 export function initMapa({ game, world, player, avatars, net, openOverlay, closeOverlay, device }) {
-  const st = { aberto: false, cx: 0, cz: 0, esc: 2, povos: [], descobrir: [], obras: [], ladrilhos: new Map(), fila: [], arrasta: null, pinca: null, ver: 0, w: VR_MAP_W, h: VR_MAP_H };
+  const st = { aberto: false, cx: 0, cz: 0, esc: 2, povos: [], descobrir: [], obras: [], ladrilhos: new Map(), fila: [], arrasta: null, pinca: null, ver: 0, w: VR_MAP_W, h: VR_MAP_H, escolha: null };
   const css = (el, o) => Object.assign(el.style, o);
   const tela = document.createElement('div');
   css(tela, { position: 'fixed', inset: '0', zIndex: 60, display: 'none', background: 'linear-gradient(180deg, #0b1016, #121a24)', cursor: 'grab', userSelect: 'none', touchAction: 'none' });
@@ -267,6 +267,14 @@ export function initMapa({ game, world, player, avatars, net, openOverlay, close
   salvar.addEventListener('click', (e) => { e.stopPropagation(); envia(); });
   campoNome.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') envia(); else if (e.key === 'Escape') fechaCaixa(); });
   function clique(mx, my) {
+    if (st.escolha) {
+      const fn = st.escolha;
+      st.escolha = null;
+      const x = Math.round(st.cx + (mx - st.w / 2) * st.esc), z = Math.round(st.cz + (my - st.h / 2) * st.esc);
+      fecha();
+      fn(x, z);
+      return;
+    }
     if (ferroviario.clicar(mx, my)) { selecionarMar(false); fechaCaixa(); return; }
     if (escolhendoMar && (net.offline || game.gmFortaleza)) {
       selecionarMar(false);
@@ -292,7 +300,15 @@ export function initMapa({ game, world, player, avatars, net, openOverlay, close
     st.fila = st.fila.filter((L) => st.ladrilhos.has(L.k));
     openOverlay?.('mapa'); tela.style.display = game.xr?.presenting ? 'none' : 'block'; net?.send?.({ t: 'construcoes?' });
   }
-  function fecha() { if (!st.aberto) return; st.aberto = false; st.mouse = null; ptrs.clear(); tela.style.display = 'none'; fechaCaixa(); ferroviario.fechar(); if (game.overlay === 'mapa') closeOverlay?.(); }
+  function fecha() { if (!st.aberto) return; st.aberto = false; st.escolha = null; st.mouse = null; ptrs.clear(); tela.style.display = 'none'; fechaCaixa(); ferroviario.fechar(); if (game.overlay === 'mapa') closeOverlay?.(); }
+  function escolher(fn) {
+    if (typeof fn !== 'function' || game.state !== 'PLAYING') return false;
+    if (game.overlay && game.overlay !== 'mapa') return false;
+    st.escolha = fn;
+    if (!st.aberto) abre();
+    if (!st.aberto) { st.escolha = null; return false; }
+    return true;
+  }
   addEventListener('keydown', (e) => {
     const t = e.target; if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
     if (caixa.style.display === 'block' && (e.code === 'KeyM' || e.code === 'Escape')) return;   // digitando o nome
@@ -317,7 +333,7 @@ export function initMapa({ game, world, player, avatars, net, openOverlay, close
     desenha();
   });
   const api = {
-    abre, fecha, zoom, centrar,
+    abre, fecha, zoom, centrar, escolher,
     mover(dx, dz) { st.cx += dx; st.cz += dz; },
     cursorUv(u, v) { st.mouse = u == null ? null : [u * st.w, (1 - v) * st.h]; },
     canvas: cv,

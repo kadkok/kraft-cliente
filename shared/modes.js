@@ -7,7 +7,9 @@
 //   sobrevivência não   não        no tempo do bloco  gasta da mochila   sim         sim        sim
 //   aventura      não   não        não                não                —           sim        sim
 //   espectador    sim   sim        não                não                —           não        não
-// Criativo também é o único com paleta infinita, formas livres, obras e obra por área. Espectador some para os outros.
+//   gm            sim   sim        rápido             sem gastar         não         sim        não
+// Criativo também é o único com paleta infinita, formas livres, obras e obra por área — o GM junta isso ao voo que
+// atravessa e some para os outros. A senha do GM não mora aqui: quem entra é o servidor.
 // No criativo, como no Minecraft, quebrar não solta item: a coleta é do sobrevivência (e do aventura, ao pegar o que
 // outros soltam).
 export const MODES = {
@@ -15,6 +17,7 @@ export const MODES = {
   sobrevivencia: { nome: 'Sobrevivência', voa: false, atravessa: false, quebra: 'tempo', poe: 'mochila', solta: true, pega: true, dano: true, criativo: false, invisivel: false },
   aventura: { nome: 'Aventura', voa: false, atravessa: false, quebra: null, poe: null, solta: true, pega: true, dano: true, criativo: false, invisivel: false },
   espectador: { nome: 'Espectador', voa: true, atravessa: true, quebra: null, poe: null, solta: false, pega: false, dano: false, criativo: false, invisivel: true },
+  gm: { nome: 'GM', voa: true, atravessa: true, quebra: 'rapido', poe: 'infinito', solta: false, pega: true, dano: false, criativo: true, invisivel: true, gm: true },
 };
 export const MODE_IDS = Object.keys(MODES);
 // Mundo sem padrão escolhido: criativo (é como o LAVRA sempre foi; /modo-padrao muda o de um mundo).
@@ -40,6 +43,7 @@ const ALIAS = {
   sobrevivencia: 'sobrevivencia', s: 'sobrevivencia', survival: 'sobrevivencia', '0': 'sobrevivencia', sobreviver: 'sobrevivencia', so: 'sobrevivencia',
   aventura: 'aventura', a: 'aventura', adventure: 'aventura', '2': 'aventura', av: 'aventura',
   espectador: 'espectador', e: 'espectador', esp: 'espectador', spectator: 'espectador', sp: 'espectador', '3': 'espectador',
+  gm: 'gm', g: 'gm', '4': 'gm',
 };
 export function parseMode(text) {
   const k = String(text || '').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');

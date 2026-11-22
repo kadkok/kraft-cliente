@@ -22,6 +22,7 @@ const TEXT = {
   sobrevivencia: 'Modo Sobrevivência: quebrar leva o tempo do bloco e solta o item; a barra é a sua mochila e pôr gasta dela; queda e afogamento machucam.',
   aventura: 'Modo Aventura: anda, pega e larga itens, mas não quebra nem põe blocos.',
   espectador: 'Modo Espectador: voa atravessando tudo, invisível para os outros; não mexe em nada.',
+  gm: 'Modo GM: voa atravessando tudo, constrói sem fim, invisível, e a barra de poderes. A entrada pede a senha do servidor.',
 };
 export const TEXTO_MODOS = TEXT;   // o menu do VR (game/menu-vr.js) mostra o mesmo texto da pausa
 const CSS = `
@@ -30,8 +31,12 @@ const CSS = `
 #palette.so-mochila .tabs, #palette.so-mochila .grid, #palette.so-mochila .card > .note, #palette.so-mochila .palette-extra > :not(.mochila) { display: none !important; }
 .modos { display: grid; gap: 8px; }
 .modos > span { font-size: 13px; color: var(--muted, #c3ccd6); }
-.modos-botoes { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.modos-botoes { display: grid; grid-template-columns: repeat(auto-fit, minmax(88px, 1fr)); gap: 6px; }
 .modos-botoes .btn { padding: 8px 4px; }
+.gm-senha-linha { display: flex; gap: 6px; }
+.gm-senha-linha.hide { display: none !important; }
+.gm-senha-linha input { flex: 1; min-width: 0; padding: 8px; border-radius: 8px; color: #eef3f8;
+  border: 1px solid rgba(255, 255, 255, .28); background: linear-gradient(180deg, rgba(18, 24, 34, .95), rgba(8, 10, 16, .95)); }
 .quebrando { position: absolute; left: 50%; top: calc(50% + 18px); transform: translateX(-50%); width: 64px; height: 6px; border-radius: 4px; overflow: hidden;
   background: linear-gradient(90deg, rgba(10, 16, 24, .7), rgba(20, 30, 42, .7)); box-shadow: 0 0 0 1px rgba(255, 255, 255, .25); }
 .quebrando > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, #f4a64e, #ffd27a); }
@@ -54,9 +59,24 @@ export function initModes({ game, player, net, ui, input, interaction, store, cl
 
   // ---- interface: escolha do modo na tela de pausa, barrinha de quebra e fôlego --------------------------------------
   const buttons = new Map();
+  const senhaGm = h('input', { type: 'password', maxlength: '64', placeholder: 'Senha do modo GM', autocomplete: 'off' });
+  const senhaLinha = h('div', { class: 'gm-senha-linha hide' }, senhaGm, h('button', { class: 'btn small', type: 'button', text: 'Entrar', onclick: () => enviarSenhaGm() }));
+  const enviarSenhaGm = () => {
+    const k = senhaGm.value;
+    senhaGm.value = '';
+    if (!k) return ui.toast('Digite a senha do modo GM.');
+    if (net.offline) return ui.toast('Sem servidor, só o modo criativo.');
+    net.send({ t: 'modo', m: 'gm', k });
+  };
+  senhaGm.addEventListener('keydown', (e) => {
+    e.stopPropagation();
+    if (e.key === 'Enter') { e.preventDefault(); enviarSenhaGm(); }
+  });
   const pick = (m) => {
     if (m === mode) return;
     if (net.offline) { if (m !== 'criativo') ui.toast('Sem servidor, só o modo criativo.'); return; }
+    if (m === 'gm') { senhaLinha.classList.remove('hide'); senhaGm.focus(); return; }
+    senhaLinha.classList.add('hide');
     net.send({ t: 'modo', m });
   };
   const row = h('div', { class: 'modos-botoes' }, MODE_IDS.map((m) => {
@@ -65,7 +85,7 @@ export function initModes({ game, player, net, ui, input, interaction, store, cl
     return b;
   }));
   const card = ui.el.pauseCard;
-  card.insertBefore(h('div', { class: 'modos' }, h('span', { text: 'Modo de jogo (como no Minecraft)' }), row), card.children[2] || null);
+  card.insertBefore(h('div', { class: 'modos' }, h('span', { text: 'Modo de jogo (como no Minecraft)' }), row, senhaLinha), card.children[2] || null);
   const digBar = h('i'), dig = h('div', { class: 'quebrando hide', 'aria-hidden': 'true' }, digBar);
   const airBar = h('i'), air = h('div', { class: 'folego hide', role: 'progressbar', 'aria-label': 'Fôlego' }, airBar);
   ui.el.hud.append(dig, air);
@@ -78,6 +98,9 @@ export function initModes({ game, player, net, ui, input, interaction, store, cl
     regrasDeAntes = r;
     game.mode = mode;
     game.modeRules = r;
+    player.speedScale = r.gm ? 2.6 : 1;
+    if (r.gm) game.gmAtivo = true;
+    if (mode === 'gm') senhaLinha.classList.add('hide');
     player.noclip = r.atravessa;
     if (game.espacoAtivo && !game.gmAtivo) {
       if (!r.atravessa) player.flying = false;
@@ -159,7 +182,7 @@ export function initModes({ game, player, net, ui, input, interaction, store, cl
     const showAir = r.dano && breath < airMax - 0.05 && game.state === 'PLAYING';
     air.classList.toggle('hide', !showAir);
     if (showAir) airBar.style.width = Math.round(breath / airMax * 100) + '%';
-    if ((r.invisivel || (game.espacoAtivo && !game.gmAtivo)) && game.overlay === 'palette') closeOverlay();     // espectador e espaços funcionais não usam mochila nem paleta
+    if (((r.invisivel && !r.gm) || (game.espacoAtivo && !game.gmAtivo)) && game.overlay === 'palette') closeOverlay();     // espectador e espaços funcionais não usam a paleta; o modo GM constrói
     if (!game.espacoAtivo && !r.criativo && creativeHotbar && input.wasPressed('pick')) {
       // o main.js pôs o bloco mirado na barra e guardou: fora do criativo, o Q escolhe o espaço da barra que tem o item
       store.set('hotbar', creativeHotbar);

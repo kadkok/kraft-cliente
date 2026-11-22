@@ -443,6 +443,8 @@ export function createAudio(getVolume, getMusic = () => 0) {
   }
 
   const SYNTH = {
+    garagem_buzina: (d,v,p,m,a) => { tone(d,a,392,.14,v*.12,'square'); tone(d,a+.19,392,.26,v*.10,'square'); },
+    garagem_barco: (d,v,p,m,a) => { tone(d,a,196,.56,v*.14,'sawtooth'); tone(d,a,246.9,.54,v*.1,'sawtooth'); },
     step: (d, v, p, m, a) => step(d, m, v, p, a),
     step_sand: (d, v, p, m, a) => step(d, MATS.sand, v, p, a),
     step_wetsand: (d, v, p, m, a) => step(d, MATS.wetsand, v, p, a),

@@ -1,0 +1,113 @@
+.garagem-tela[hidden],
+.garagem-hud[hidden],
+.garagem-hud button[hidden] {
+  display: none;
+}
+.garagem-tela {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: grid;
+  place-items: center;
+  padding: clamp(10px, 3vw, 36px);
+  background: #08131eb8;
+}
+.garagem-painel {
+  width: min(100%, 44rem);
+  max-width: 100%;
+  max-height: 100%;
+  min-width: min(100%, 13rem);
+  min-height: min(100%, 8rem);
+  resize: both;
+  overflow: auto;
+  box-sizing: border-box;
+  padding: clamp(14px, 3vw, 26px);
+}
+.garagem-ampliada .garagem-painel {
+  width: 100% !important;
+  height: 100% !important;
+  resize: none;
+}
+.garagem-painel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+.garagem-painel h2 {
+  flex: 1;
+  margin: 0;
+}
+.garagem-painel p {
+  margin: 0.6rem 0 1rem;
+}
+.garagem-opcoes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.6rem), 1fr));
+  gap: 0.55rem;
+}
+.garagem-opcao {
+  background: #203343;
+  color: #f3f7fa;
+  border: 1px solid #768b9a;
+  border-radius: 0.6rem;
+  font: inherit;
+  cursor: pointer;
+  min-width: 0;
+  padding: 0.35rem 0.45rem 0.6rem;
+}
+.garagem-opcao:hover,
+.garagem-opcao:focus-visible {
+  border-color: #ffd38b;
+  background: #2e495d;
+}
+.garagem-opcao img {
+  display: block;
+  width: 100%;
+  height: clamp(3.7rem, 10vh, 6.2rem);
+  object-fit: contain;
+}
+.garagem-status {
+  display: block;
+  color: #ffdb9e;
+  margin-top: 0.4rem;
+}
+.garagem-hud {
+  position: absolute;
+  pointer-events: auto;
+  left: 50%;
+  bottom: calc(var(--safe-b, 0px) + 4.5rem);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.4rem;
+  flex-wrap: wrap;
+  max-width: calc(100vw - 1rem);
+  background: #122130ed;
+  color: white;
+  border-radius: 0.55rem;
+}
+.garagem-medidas {
+  display: flex;
+  flex-direction: column;
+  min-width: 6.6em;
+  padding: 0 0.4rem;
+  font-size: 0.81rem;
+}
+.garagem-hud button {
+  touch-action: none;
+  white-space: nowrap;
+}
+@media (max-width: 650px) {
+  .garagem-hud {
+    top: calc(3.5rem + var(--safe-t, 0px));
+    bottom: auto;
+    width: max-content;
+  }
+  .garagem-hud button {
+    min-height: 32px;
+    padding: 0.28rem 0.42rem;
+  }
+}
