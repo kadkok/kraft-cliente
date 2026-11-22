@@ -1,65 +1,245 @@
-// LAVRA — barra do modo GM. Só aparece com game.mode === 'gm'. O servidor confere de novo cada pedido.
-// Faixa do HUD, não uma janela travada: quebra a linha e acompanha a largura da tela.
+// Ferramentas do modo GM. O servidor confere a autorização de cada operação.
 import { h } from '../ui/ui.js';
 import { ARVORES } from '../../shared/gm.js';
 
 const CSS = `
-.gm-barra { position: absolute; z-index: 6; left: 50%; top: calc(8px + env(safe-area-inset-top, 0px)); transform: translateX(-50%);
-  width: min(980px, calc(100vw - 16px)); display: flex; flex-wrap: wrap; gap: 6px; align-items: center; pointer-events: auto;
-  padding: 8px; border-radius: 12px; color: #eef3f8;
-  background: linear-gradient(180deg, rgba(28, 36, 48, .92), rgba(12, 16, 24, .9));
-  box-shadow: 0 8px 24px rgba(0, 0, 0, .35), inset 0 0 0 1px rgba(255, 255, 255, .16); }
-.gm-barra.hide { display: none !important; }
-.gm-barra .btn { padding: 6px 8px; }
-.gm-barra input, .gm-barra select { min-width: 0; padding: 6px 8px; border-radius: 8px; color: #eef3f8;
-  border: 1px solid rgba(255, 255, 255, .28); background: linear-gradient(180deg, rgba(18, 24, 34, .95), rgba(8, 10, 16, .95)); }
-.gm-barra .gm-pin { font: 600 12px/1.3 system-ui; color: #d5deea; }
+.gm-acesso[hidden], .gm-tela[hidden] { display: none !important; }
+.gm-tela { position: fixed; inset: 0; z-index: 65; display: grid; place-items: center; padding: clamp(7px, 2.5vw, 30px); background: #09131dc2; }
+.gm-barra { width: min(100%, 52rem); max-width: 100%; max-height: 100%; min-width: min(15rem, 100%); min-height: min(10rem, 100%); box-sizing: border-box; resize: both; overflow: auto; padding: clamp(.65rem, 2vw, 1.3rem); color: #eef3f8; }
+.gm-tela.ampliada .gm-barra { width: 100% !important; height: 100% !important; resize: none; }
+.gm-cabeca, .gm-acoes { display: flex; align-items: center; flex-wrap: wrap; gap: .45rem; }
+.gm-cabeca h2 { flex: 1; margin: 0; }
+.gm-grupos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); gap: .65rem; margin: 1rem 0; }
+.gm-grupos fieldset { min-width: 0; margin: 0; padding: .65rem; border: 1px solid #506171; border-radius: .6rem; }
+.gm-grupos legend { padding: 0 .3rem; font-weight: 700; }
+.gm-grupos label, .gm-grupos .gm-pin { display: block; margin: .25rem 0; }
+.gm-pin { font-size: .85rem; color: #d5deea; }
+.gm-grupos input, .gm-grupos select { display: block; width: 100%; box-sizing: border-box; margin: .2rem 0 .45rem; padding: .45rem; border: 1px solid #8698a6; border-radius: .35rem; color: #f4f7fa; background: #14212b; font: inherit; }
+.gm-barra :focus-visible { outline: 2px solid #ffcf7d; outline-offset: 2px; }
+.gm-navega { justify-content: flex-end; }
 `;
 
-export function initGm({ game, net, ui, mapa }) {
-  const style = document.createElement('style');
-  style.textContent = CSS;
-  document.head.append(style);
-  let pin = null, outro = null, origem = false;
-  const pinTxt = h('span', { class: 'gm-pin', text: 'Nenhum ponto marcado.' });
-  const nomeAnel = h('input', { type: 'text', maxlength: '24', placeholder: 'Nome do par (opcional)', autocomplete: 'off' });
-  const nomePessoa = h('input', { type: 'text', maxlength: '24', placeholder: 'Nome de quem joga', autocomplete: 'off' });
-  const especie = h('input', { type: 'text', maxlength: '32', placeholder: 'Espécie (coelho, lobo…)', autocomplete: 'off' });
-  const tipoArvore = h('select', {}, Object.keys(ARVORES).map((k) => h('option', { value: k, text: k })));
-  const manda = (op, extra = {}) => {
+export function initGm({ game, net, ui, mapa, openOverlay, closeOverlay, pausar, touch }) {
+  document.head.append(h('style', { text: CSS }));
+  let pin = null,
+    outro = null,
+    origem = false;
+  let entradaVista = false,
+    voltarDoMapa = false,
+    soltouEm = -Infinity;
+  const botao = (text, onclick) => h('button', { class: 'btn small', type: 'button', text, onclick });
+  const acoes = (...filhos) => h('div', { class: 'gm-acoes' }, ...filhos);
+  const campo = (rotulo, max, placeholder) => {
+    const el = h('input', { type: 'text', maxlength: String(max), placeholder, autocomplete: 'off' });
+    return { el, linha: h('label', {}, rotulo, el) };
+  };
+  const grupo = (nome, ...filhos) => h('fieldset', {}, h('legend', { text: nome }), ...filhos);
+  const pinTxt = h('span', { class: 'gm-pin', 'aria-live': 'polite', text: 'Nenhum ponto marcado.' });
+  const anel = campo('Nome do par de anéis', 24, 'Opcional');
+  const pessoa = campo('Nome de quem joga', 24, 'Nome do jogador');
+  const especie = campo('Espécie', 32, 'Coelho, lobo…');
+  const arvore = h(
+    'select',
+    {},
+    Object.keys(ARVORES).map((k) => h('option', { value: k, text: k })),
+  );
+  function manda(op, extra = {}) {
     if (game.mode !== 'gm') return ui.toast('Entre no modo GM.');
     if (net.offline) return ui.toast('O modo GM precisa do servidor.');
     net.send({ t: 'gmop', op, ...extra });
-  };
-  const marcar = (fn) => {
+  }
+  function marcar(fn) {
     if (!mapa?.escolher) return ui.toast('O mapa ainda não está pronto.');
-    const ok = mapa.escolher(fn);
-    if (!ok) ui.toast('Feche o que está aberto e marque no mapa.');
-  };
-  const bar = h('div', { class: 'gm-barra hide' },
-    h('button', { class: 'btn small', type: 'button', text: 'Marcar no mapa', onclick: () => marcar((x, z) => { pin = { x, z }; pinTxt.textContent = `Ponto ${x}, ${z}. Ir agora confirma.`; }) }),
-    h('button', { class: 'btn small', type: 'button', text: 'Ir agora', onclick: () => { if (!pin) return ui.toast('Marque um ponto no mapa.'); manda('mapa', pin); } }),
-    pinTxt,
-    h('button', { class: 'btn small', type: 'button', text: 'Anel aqui', onclick: () => { origem = true; manda('anel', { passo: 'aqui' }); } }),
-    h('button', { class: 'btn small', type: 'button', text: 'Outro lado', onclick: () => marcar((x, z) => { outro = { x, z }; ui.toast(`Outro lado em ${x}, ${z}.`); }) }),
-    nomeAnel,
-    h('button', { class: 'btn small', type: 'button', text: 'Plantar os dois', onclick: () => { if (!origem || !outro) return ui.toast('Marque a origem e o outro lado.'); manda('anel', { passo: 'plantar', ...outro, nome: nomeAnel.value }); } }),
-    h('button', { class: 'btn small', type: 'button', text: 'Apagar anel', onclick: () => manda('apagar', { nome: nomeAnel.value }) }),
-    nomePessoa,
-    h('button', { class: 'btn small', type: 'button', text: 'Ir até', onclick: () => manda('ir', { nome: nomePessoa.value }) }),
-    h('button', { class: 'btn small', type: 'button', text: 'Trazer', onclick: () => manda('trazer', { nome: nomePessoa.value }) }),
-    especie,
-    h('button', { class: 'btn small', type: 'button', text: 'Bicho adulto', onclick: () => manda('bicho', { nome: especie.value }) }),
-    tipoArvore,
-    h('button', { class: 'btn small', type: 'button', text: 'Árvore grande', onclick: () => manda('arvore', { nome: tipoArvore.value }) }),
-    h('button', { class: 'btn small', type: 'button', text: 'Aldeia aqui', onclick: () => manda('povoado') }),
-    h('button', { class: 'btn small', type: 'button', text: 'Carro', onclick: () => manda('carro') }),
-    h('button', { class: 'btn small', type: 'button', text: 'Avião', onclick: () => manda('aviao') }),
-    h('button', { class: 'btn small', type: 'button', text: 'Barco', onclick: () => manda('barco') }),
-    h('button', { class: 'btn small', type: 'button', text: 'Bola', onclick: () => manda('bola') }),
-    h('button', { class: 'btn small', type: 'button', text: 'Ilha no mar', onclick: () => manda('ilha') }),
+    closeOverlay(false);
+    voltarDoMapa = true;
+    if (!mapa.escolher(fn)) {
+      voltarDoMapa = false;
+      abrir();
+      ui.toast('Não foi possível abrir o mapa.');
+    }
+  }
+  const ampliar = botao('Maximizar', alternarTamanho);
+  ampliar.setAttribute('aria-pressed', 'false');
+  const voltar = botao('Voltar ao jogo', () => closeOverlay());
+  const menu = botao('Menu do jogo', () => {
+    closeOverlay(false);
+    pausar();
+  });
+  const cabeca = h('header', { class: 'gm-cabeca' }, h('h2', { id: 'gm-titulo', text: 'Painel GM' }), ampliar);
+  const grupos = h(
+    'div',
+    { class: 'gm-grupos' },
+    grupo(
+      'Mapa',
+      acoes(
+        botao('Marcar no mapa', () =>
+          marcar((x, z) => {
+            pin = { x, z };
+            pinTxt.textContent = 'Ponto ' + x + ', ' + z + '. Ir agora confirma.';
+          }),
+        ),
+        botao('Ir agora', () => (pin ? manda('mapa', pin) : ui.toast('Marque um ponto no mapa.'))),
+      ),
+      pinTxt,
+    ),
+    grupo(
+      'Anéis',
+      anel.linha,
+      acoes(
+        botao('Anel aqui', () => {
+          origem = true;
+          manda('anel', { passo: 'aqui' });
+        }),
+        botao('Outro lado', () =>
+          marcar((x, z) => {
+            outro = { x, z };
+            ui.toast('Outro lado em ' + x + ', ' + z + '.');
+          }),
+        ),
+        botao('Plantar os dois', () =>
+          origem && outro
+            ? manda('anel', { passo: 'plantar', ...outro, nome: anel.el.value })
+            : ui.toast('Marque a origem e o outro lado.'),
+        ),
+        botao('Apagar anel', () => manda('apagar', { nome: anel.el.value })),
+      ),
+    ),
+    grupo(
+      'Jogadores',
+      pessoa.linha,
+      acoes(
+        botao('Ir até', () => manda('ir', { nome: pessoa.el.value })),
+        botao('Trazer', () => manda('trazer', { nome: pessoa.el.value })),
+      ),
+    ),
+    grupo(
+      'Natureza',
+      especie.linha,
+      botao('Bicho adulto', () => manda('bicho', { nome: especie.el.value })),
+      h('label', {}, 'Tipo de árvore', arvore),
+      acoes(
+        botao('Árvore grande', () => manda('arvore', { nome: arvore.value })),
+        botao('Aldeia aqui', () => manda('povoado')),
+        botao('Ilha no mar', () => manda('ilha')),
+      ),
+    ),
+    grupo(
+      'Veículos e bola',
+      acoes(
+        ...[
+          ['Carro', 'carro'],
+          ['Avião', 'aviao'],
+          ['Barco', 'barco'],
+          ['Bola', 'bola'],
+        ].map(([nome, op]) => botao(nome, () => manda(op))),
+      ),
+    ),
   );
-  ui.el.hud.append(bar);
-  game.hooks.frame.push(() => { bar.classList.toggle('hide', game.mode !== 'gm' || game.state !== 'PLAYING'); });
-  return { bar };
+  const bar = h(
+    'section',
+    {
+      class: 'panel gm-barra',
+      role: 'dialog',
+      'aria-modal': 'true',
+      'aria-labelledby': 'gm-titulo',
+      tabindex: '-1',
+    },
+    cabeca,
+    grupos,
+    h('footer', { class: 'gm-acoes gm-navega' }, menu, voltar),
+  );
+  const tela = h('div', { class: 'gm-tela' }, bar);
+  const acesso = botao(touch ? 'Painel GM' : 'Painel GM · F2', () => abrir());
+  acesso.classList.add('gm-acesso');
+  acesso.setAttribute('aria-haspopup', 'dialog');
+  acesso.title = 'Abrir o painel GM (Esc ou F2)';
+  acesso.hidden = tela.hidden = true;
+  document.body.append(tela);
+  ui.el.corner.append(acesso);
+
+  function alternarTamanho() {
+    const grande = tela.classList.toggle('ampliada');
+    ampliar.textContent = grande ? 'Restaurar' : 'Maximizar';
+    ampliar.setAttribute('aria-pressed', String(grande));
+  }
+  cabeca.addEventListener('dblclick', (e) => {
+    if (!e.target.closest('button')) alternarTamanho();
+  });
+  function abrir(aoSoltar = false) {
+    if (game.mode !== 'gm' || game.state !== 'PLAYING' || game.overlay) return false;
+    entradaVista = true;
+    if (aoSoltar) soltouEm = performance.now();
+    openOverlay('gm');
+    tela.hidden = false;
+    bar.focus({ preventScroll: true });
+    return true;
+  }
+  bar.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' || e.code === 'F2') return;
+    e.stopPropagation(); // Letras, espaço e as teclas de edição pertencem ao campo em foco.
+    if (e.key !== 'Tab') return;
+    const itens = [...bar.querySelectorAll('button,input,select')].filter((el) => !el.disabled);
+    if (e.shiftKey && (e.target === itens[0] || e.target === bar)) {
+      e.preventDefault();
+      itens.at(-1)?.focus();
+    }
+    if (!e.shiftKey && e.target === itens.at(-1)) {
+      e.preventDefault();
+      itens[0]?.focus();
+    }
+  });
+  addEventListener(
+    'keydown',
+    (e) => {
+      if (
+        e.code !== 'F2' ||
+        e.repeat ||
+        e.ctrlKey ||
+        e.metaKey ||
+        e.altKey ||
+        game.mode !== 'gm' ||
+        game.state !== 'PLAYING'
+      )
+        return;
+      if (game.overlay === 'gm') closeOverlay();
+      else if (!abrir()) return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    },
+    true,
+  );
+  game.hooks.other.push((m) => {
+    if (m.t === 'overlay-closed' && m.was === 'gm') {
+      tela.hidden = true;
+      if (bar.contains(document.activeElement)) document.activeElement.blur();
+    }
+    if (m.t === 'overlay-closed' && m.was === 'mapa' && voltarDoMapa) {
+      voltarDoMapa = false;
+      abrir();
+    }
+    if (m.t === 'welcome' || m.t === 'offline') {
+      pin = outro = null;
+      origem = voltarDoMapa = entradaVista = false;
+      anel.el.value = pessoa.el.value = especie.el.value = '';
+      pinTxt.textContent = 'Nenhum ponto marcado.';
+    }
+  });
+  game.hooks.frame.push(() => {
+    const gm = game.mode === 'gm',
+      jogando = game.state === 'PLAYING';
+    if (!gm) {
+      entradaVista = voltarDoMapa = false;
+      if (game.overlay === 'gm') closeOverlay();
+    }
+    if (gm && jogando && !entradaVista && !game.overlay) abrir();
+    if (!jogando || game.overlay !== 'gm') tela.hidden = true;
+    const esconder = !gm || !jogando || !!game.overlay;
+    if (acesso.hidden !== esconder) acesso.hidden = esconder;
+  });
+  return {
+    abrir,
+    aoContinuar: () => !entradaVista && abrir(),
+    // Alguns navegadores entregam pointerlockchange antes do keydown do mesmo Escape.
+    acabouDeSoltar: () => performance.now() - soltouEm < 100,
+  };
 }

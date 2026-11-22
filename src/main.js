@@ -538,7 +538,7 @@ initVulcao({ game, scene, camera });
 initIlhasProps({ game, scene, camera });
 initCidadeLonge({ game, scene, camera, world });
 initMapa({ game, world, player, avatars, net, openOverlay, closeOverlay, device });
-initGm({ game, net, ui, mapa: game.mapa });
+game.painelGM = initGm({ game, net, ui, mapa: game.mapa, openOverlay, closeOverlay, pausar: () => transition('PAUSED'), touch: device.touch });
 const hudNautico = initHudNautico({ game, world, player, avatars, getWind: () => U.uWind.value, getSeaInfo: () => place });
 game.hudNautico = hudNautico;
 initCosta({ game, world, player, net, ui, input, scene, camera, avatars });
@@ -571,7 +571,7 @@ function transition(to) {
   game.state = to;
   input.clearAll(); kbm.clear();
   if (to === 'MENU') { ui.screen('menu'); ui.hud(false); game.overlay = null; unlock(); self.root.visible = false; }
-  else if (to === 'PLAYING') { ui.screen(null); ui.hud(true); lock(); }
+  else if (to === 'PLAYING') { ui.screen(null); ui.hud(true); if (!game.painelGM?.aoContinuar()) lock(); }
   else if (to === 'PAUSED') { ui.screen('pause'); unlock(); }
   return true;
 }
@@ -589,22 +589,26 @@ function openOverlay(kind) {
   unlock();
   if (kind === 'palette') { ui.palette(game.hotbar[game.sel]); crafting?.renderQuick(); ui.screen('palette'); }
 }
-function closeOverlay() {
+function closeOverlay(recapturar = true) {
   if (!game.overlay) return;
   const was = game.overlay;
   game.overlay = null;
   if (was === 'chat') ui.chatClose();
   for (const f of game.hooks.other) f({ t: 'overlay-closed', was });
-  if (game.state === 'PLAYING') { ui.screen(null); lock(); }
+  if (game.state === 'PLAYING' && !game.overlay) { ui.screen(null); if (recapturar) lock(); }
 }
 document.addEventListener('pointerlockchange', () => {
   // Esc solta o ponteiro: sem tela aberta, isso é "pausar"
-  if (document.pointerLockElement !== canvas && game.state === 'PLAYING' && !game.overlay && wantsLock()) transition('PAUSED');
+  if (document.pointerLockElement !== canvas && game.state === 'PLAYING' && !game.overlay && wantsLock()) {
+    if (!game.painelGM?.abrir(true)) transition('PAUSED');
+  }
 });
 canvas.addEventListener('click', () => { if (game.state === 'PLAYING' && !game.overlay) lock(); });
 addEventListener('keydown', (e) => {
-  if (e.code !== 'Escape') return;
+  if (e.code !== 'Escape' || e.defaultPrevented || e.repeat) return;
+  if (game.overlay === 'gm' && game.painelGM?.acabouDeSoltar()) return;
   if (game.overlay) closeOverlay();
+  else if (game.state === 'PLAYING' && game.painelGM?.abrir()) e.preventDefault();
   else if (game.state === 'PAUSED') transition('PLAYING');
   else if (game.state === 'PLAYING' && !wantsLock()) transition('PAUSED');
   // tela cheia com teclado preso (game/tela-cheia.js): o Esc chega aqui com o ponteiro ainda preso — solta e pausa como antes
