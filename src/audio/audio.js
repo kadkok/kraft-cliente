@@ -68,7 +68,7 @@ export function createAudio(getVolume, getMusic = () => 0) {
   let stepSide = 1;
   const voices = { sfx: 0, amb: 0, mus: 0 }, routes = new WeakMap();
   let t0 = 0, bedsReady = false, worldProbe = null;
-  const ev = { bird: 4, cricket: 2, drip: 3, whisper: 6, frog: 8, owl: 11, gull: 7, tern: 5, surf: 1.8, whale: 12, gust: 6, bubble: 2.5, music: 24 };
+  const ev = { bird: 4, cricket: 2, drip: 3, whisper: 6, frog: 8, owl: 11, gull: 7, tern: 5, surf: 1.8, whale: 12, gust: 6, bubble: 2.5, music: 24, cave: 25, subAdd: 4, subRara: 30 };
   const surfQueue = [];
   let surfWaveIdx = 0;
   const gustState = { v: 0.45, target: 0.6, t: 0 };
@@ -125,7 +125,7 @@ export function createAudio(getVolume, getMusic = () => 0) {
   document.addEventListener('visibilitychange', () => { if (!ctx) return; if (document.hidden) ctx.suspend(); else ctx.resume(); });
 
   // ---- sons gravados -------------------------------------------------------------------------------------------
-  const AUDIO_REV = '20261119-tw';
+  const AUDIO_REV = '20261122-mc';   // 22/11: sons do Minecraft (audio/PROCEDENCIA-minecraft.json)
   function fetchAndDecode(file) {
     let p = decodedFiles.get(file);
     if (!p) {
@@ -772,13 +772,16 @@ export function createAudio(getVolume, getMusic = () => 0) {
     }
     ev.music -= dt;
     if (ev.music > 0 || voices.mus > 0) return;
-    const list = streams.get(env.zone ? 'musica.zona' : env.night > 0.5 ? 'musica.noite' : 'musica.dia') || streams.get('musica');
+    const list = (env.underwater && !env.zone ? streams.get('musica.agua') : null)
+      || streams.get(env.zone ? 'musica.zona' : env.night > 0.5 ? 'musica.noite' : 'musica.dia') || streams.get('musica');
     if (list && list.length) {
       if (musicEl && !musicEl.ended && !musicEl.paused) {
         if (musicGain) musicGain.gain.setTargetAtTime(0.65, ctx.currentTime, 1.2);
         ev.music = 5;
         return;
       }
+      // como no Minecraft: acabou a faixa, fica um tempo só com o ambiente antes da próxima (22/11, pedido do Kadmus)
+      if (musicEl && musicEl.ended) { musicEl = null; ev.music = rnd(45, 150); return; }
       musicEl = new Audio(list[(Math.random() * list.length) | 0]);
       try {
         musicGain = ctx.createGain();
@@ -938,7 +941,10 @@ export function createAudio(getVolume, getMusic = () => 0) {
     const fallRush = !under && !env.zone ? clamp(((env.fallSpeed || 0) - 7.5) / 20, 0, 1) : 0;
     // Fora do espaço da fonte -> ganho vai a zero (vento não vaza para dentro de caverna fechada).
     // Deslocamento do ar ao voar ou cair depressa (fly, arqueda) é real mesmo sem vento: vem do movimento de quem joga.
-    setG(beds.vento, under ? 0 : quiet * (open * 0.13 * Math.pow(ar, 0.8) * (1 + (env.alt || 0)) * (0.55 + 0.45 * gust) + (open > 0.2 ? 0.28 * fly * fly : 0)));
+    // "Ambiente sempre presente" (22/11, pedido do Kadmus): ao ar livre fica uma brisa leve mesmo com calmaria
+    const terra = !env.zone && !env.nano && ((env.seaWater ?? 0) < 0.7 || (env.beach || 0) > 0.1);
+    const brisa = !under && terra && open > 0.5 ? 0.03 * open * quiet : 0;
+    setG(beds.vento, under ? 0 : brisa + quiet * (open * 0.13 * Math.pow(ar, 0.8) * (1 + (env.alt || 0)) * (0.55 + 0.45 * gust) + (open > 0.2 ? 0.28 * fly * fly : 0)));
     if (beds.vento.f) beds.vento.f.frequency.setTargetAtTime(280 + 420 * gust + 900 * fly + (env.zone ? -120 : 0), t, 0.8);
     setG(beds.arqueda, fallRush * 0.28, 0.12);
     setG(beds.mata, under ? 0 : quiet * (env.trees || 0) * open * 0.06 * Math.pow(ar, 0.7) * (0.4 + 0.6 * gust * gust));
@@ -955,17 +961,17 @@ export function createAudio(getVolume, getMusic = () => 0) {
     setG(beds.pier_lap, under ? 0 : quiet * open * (env.nearPier ? 0.18 : 0), 0.5);
     // Ambiência submersa under_reef + canto de baleia
     const hasReef = beds.under_reef?.sampled;
-    setG(beds.under_reef, under ? 0.25 * (0.85 + 0.3 * depth) : 0, 0.22);
-    setG(beds.submerso, under ? (hasReef ? 0.08 : 0.24) : 0, 0.22);
+    setG(beds.under_reef, under ? (hasReef ? 0.12 : 0.25) * (0.85 + 0.3 * depth) : 0, 0.22);
+    setG(beds.submerso, under ? 0.22 : 0, 0.22);   // fundo do Minecraft (mc.submerso.ogg), na frente do recife
     // Canto de baleia só com uma baleia de verdade a até 400 m (o som corre longe na água; mais perto, mais forte).
     const whaleSwell = 0.4 + 0.6 * Math.max(0, Math.sin(s * 0.11));
     const baleia = clamp(1 - (env.baleiaDist ?? Infinity) / 400, 0, 1);
     setG(beds.whale_song, under && !env.zone && !env.nano ? 0.16 * baleia * whaleSwell : 0, 0.8);
     setG(beds.bolha, under && !env.zone ? 0.11 : 0, 0.28);
     setG(beds.chuva, under || env.zone || env.nano ? 0 : quiet * rain * open * 0.25, 0.45);
-    const flora = Math.min(1, (env.trees || 0) * 1.4 + (env.grass || 0) * 0.5);
+    const flora = Math.max(terra ? 0.35 : 0, Math.min(1, (env.trees || 0) * 1.4 + (env.grass || 0) * 0.5));   // piso: sempre presente em terra
     setG(beds.passaros, under || env.zone || env.nano || open < 0.25 ? 0 : quiet * open * Math.max(0, day - 0.25) * (1 - 0.75 * rain) * flora * 0.16, 0.8);
-    setG(beds.grilos, under || env.zone || env.nano || open < 0.25 ? 0 : quiet * open * Math.max(0, (env.night || 0) - 0.35) * (1 - 0.7 * rain) * Math.min(1, (env.grass || 0) * 1.2 + (env.trees || 0) * 0.8) * 0.15, 0.8);
+    setG(beds.grilos, under || env.zone || env.nano || open < 0.25 ? 0 : quiet * open * Math.max(0, (env.night || 0) - 0.35) * (1 - 0.7 * rain) * Math.max(terra ? 0.3 : 0, Math.min(1, (env.grass || 0) * 1.2 + (env.trees || 0) * 0.8)) * 0.15, 0.8);
 
     stepCoastalSurf(dt, s, env, open, quiet, seaLevel, waveE);
 
@@ -978,6 +984,13 @@ export function createAudio(getVolume, getMusic = () => 0) {
       if (day > 0.38 && (env.seaWater ?? env.water ?? 0) > 0.16 && (ev.gull -= dt) <= 0) { gull(amb * 0.76, env); ev.gull = rnd(7, 19); }
       if (day > 0.38 && (env.seaWater ?? env.water ?? 0) > 0.16 && (ev.tern -= dt) <= 0) { tern(amb * 0.68, env); ev.tern = rnd(8, 21); }
     }
+    // Caverna do Minecraft: no escuro abaixo do nível do mar (place.caverna, main.js), de tempos em tempos
+    if (!under && !env.zone && !env.nano && (env.caverna || 0) > 0.5 && (ev.cave -= dt) <= 0) {
+      sample(['ambiente.caverna'], () => pan(rnd(-0.7, 0.7), 0.34 * quiet), 1, rnd(0.93, 1.04));
+      ev.cave = rnd(35, 110);
+    }
+    if (under && !env.zone && (ev.subAdd -= dt) <= 0) { sample(['ambiente.submerso_add'], () => pan(rnd(-0.8, 0.8), 0.2), 1, rnd(0.95, 1.05)); ev.subAdd = rnd(2.5, 7); }
+    if (under && !env.zone && (ev.subRara -= dt) <= 0) { sample(['ambiente.submerso_rara'], () => pan(rnd(-0.6, 0.6), 0.24), 1, rnd(0.96, 1.03)); ev.subRara = rnd(20, 55); }
     if (under && !env.zone && (ev.bubble -= dt) <= 0) { play('bubble', 0.28, rnd(0.9, 1.15), 'water'); ev.bubble = rnd(2.2, 5.5); }
     // Rajada só com vento a partir de ~4,5 m/s; mais vento, mais frequente e mais forte.
     if (!under && open > 0.62 && !env.zone && ar > 0.27 && (ev.gust -= dt) <= 0) {

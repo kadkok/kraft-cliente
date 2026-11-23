@@ -1,0 +1,314 @@
+{
+ "origem": "Minecraft Java Edition (Mojang), arquivos do índice de assets 32 do Prism Launcher do Kadmus",
+ "quando": "2026-11-22",
+ "pedido": "Kadmus: \"o som ambiente ficou sem, podia ter copiado do minecraft prism launcher\"",
+ "uso": "jogo de uso privado do Kadmus; a licença é de quem lança (memória feedback_lavra_uso_privado_licencas)",
+ "trocados": {
+  "musica.dia": [
+   "musica.dia-1.ogg",
+   "musica.dia-2.ogg"
+  ],
+  "musica.noite": [
+   "musica.noite-1.ogg",
+   "musica.noite-2.ogg"
+  ],
+  "thunder": [
+   "trovao-1.ogg",
+   "trovao-2.ogg",
+   "trovao-3.ogg"
+  ],
+  "ambiente.chuva": [
+   "ambiente.chuva-1.ogg",
+   "ambiente.chuva-2.ogg"
+  ],
+  "ambiente.submerso": [
+   "mar.under_reef.ogg",
+   "ambiente.submerso-1.ogg",
+   "ambiente.submerso-2.ogg",
+   "ambiente.submerso-3.ogg",
+   "ambiente.submerso-4.ogg"
+  ]
+ },
+ "arquivos": {
+  "mc.caverna-1.ogg": {
+   "de": "minecraft/sounds/ambient/cave/cave1.ogg",
+   "sha256": "086721797a2ddcf6ba4b75cb9787a5340f10a5f73190f1310e4d80b3c7d29fb7"
+  },
+  "mc.caverna-10.ogg": {
+   "de": "minecraft/sounds/ambient/cave/cave10.ogg",
+   "sha256": "ca537ff2e410b2dada414daf773897ea901f1d09ba33371ca8f4a0e2d6292855"
+  },
+  "mc.caverna-11.ogg": {
+   "de": "minecraft/sounds/ambient/cave/cave11.ogg",
+   "sha256": "bbf911dbe638faf9f3575fda5899380fc03aec2e861f31382e795786299b41ab"
+  },
+  "mc.caverna-12.ogg": {
+   "de": "minecraft/sounds/ambient/cave/cave12.ogg",
+   "sha256": "0765a53612d1f63152681752fa377a83dabb4d0317be610445b2afff3505e46d"
+  },
+  "mc.caverna-13.ogg": {
+   "de": "minecraft/sounds/ambient/cave/cave13.ogg",
+   "sha256": "d322af20706133b52baaa9778b9a53292cea145836206ce32fd1f42051c8cbe0"
+  },
+  "mc.caverna-14.ogg": {
+   "de": "minecraft/sounds/ambient/cave/cave14.ogg",
+   "sha256": "01ac94ef2ab9d5767aac53bab442e4618ca23820cc151ad1b9699663003ba5a0"
+  },
+  "mc.caverna-15.ogg": {
+   "de": "minecraft/sounds/ambient/cave/cave15.ogg",
+   "sha256": "0a5872006d1cd73efc223561f7a6a044ada070647392a8204f6340a3c7781757"
+  },
+  "mc.caverna-16.ogg": {
+   "de": "minecraft/sounds/ambient/cave/cave16.ogg",
+   "sha256": "b394585a2f83dbde23fdbdad76843906ff8d61b8c086692184df118f604b0630"
+  },
+  "mc.caverna-17.ogg": {
+   "de": "minecraft/sounds/ambient/cave/cave17.ogg",
+   "sha256": "60588f178668844945c25cffcf3a33938fc028a93fd653abb70504120918377a"
+  },
+  "mc.caverna-18.ogg": {
+   "de": "minecraft/sounds/ambient/cave/cave18.ogg",
+   "sha256": "c614f7112ec3155b8b8139e3582c0480cf9a49d906f2b9cd9c2bfd60d0a78ac7"
+  },
+  "mc.caverna-19.ogg": {
+   "de": "minecraft/sounds/ambient/cave/cave19.ogg",
+   "sha256": "3918c39e2510936761cc5f3e983e7f6bf98fea67c9029b311868d1ebb15a43e6"
+  },
+  "mc.caverna-2.ogg": {
+   "de": "minecraft/sounds/ambient/cave/cave2.ogg",
+   "sha256": "18f5b3001d55b17e767c0b0a13dee62240187d4960ae8c5eef1bea73d1df392a"
+  },
+  "mc.caverna-20.ogg": {
+   "de": "minecraft/sounds/ambient/cave/cave20.ogg",
+   "sha256": "064e0622d54070fefe0dd13a35a240f1057f1ff08e02b461a22e3a945850ec4b"
+  },
+  "mc.caverna-21.ogg": {
+   "de": "minecraft/sounds/ambient/cave/cave21.ogg",
+   "sha256": "bcb9551b28541070f3eac94d977331c9342c48d1382937a608b7b23518960b68"
+  },
+  "mc.caverna-22.ogg": {
+   "de": "minecraft/sounds/ambient/cave/cave22.ogg",
+   "sha256": "f6cfbc03ede3a7c44fd3d2d1f0f4b6d1822edd74334b95275f3ee529410975fc"
+  },
+  "mc.caverna-23.ogg": {
+   "de": "minecraft/sounds/ambient/cave/cave23.ogg",
+   "sha256": "068eb390de1c23be4bb819dc8fffe628a0a3939a8c8e904a3b1b89f909142fdc"
+  },
+  "mc.caverna-3.ogg": {
+   "de": "minecraft/sounds/ambient/cave/cave3.ogg",
+   "sha256": "dd96613af2ea1a58f6bfbe8c2f76c3bece7d7363dd5aeb57af6805546885d478"
+  },
+  "mc.caverna-4.ogg": {
+   "de": "minecraft/sounds/ambient/cave/cave4.ogg",
+   "sha256": "c667f11f5b8a2c901fb219544e021ee69fc3b0b894cb73a8a55aa5b063df9179"
+  },
+  "mc.caverna-5.ogg": {
+   "de": "minecraft/sounds/ambient/cave/cave5.ogg",
+   "sha256": "28fdeb79f5f1167031b56b9ce2057ab9221e4d31fb36c2d904051c5a0c22a85c"
+  },
+  "mc.caverna-6.ogg": {
+   "de": "minecraft/sounds/ambient/cave/cave6.ogg",
+   "sha256": "5f44293d146b2d017e218be222f2ca3d208c7326cacbbc1bac146147229468d5"
+  },
+  "mc.caverna-7.ogg": {
+   "de": "minecraft/sounds/ambient/cave/cave7.ogg",
+   "sha256": "35a908dc807f457c7355a2d4fa505b6ed3e0e3a0b4a0af5c8dbe954cd33c1bcb"
+  },
+  "mc.caverna-8.ogg": {
+   "de": "minecraft/sounds/ambient/cave/cave8.ogg",
+   "sha256": "c3ea580bb6d897c9ed6e741c13794a649adf5a13218365e80e2f52a13c467626"
+  },
+  "mc.caverna-9.ogg": {
+   "de": "minecraft/sounds/ambient/cave/cave9.ogg",
+   "sha256": "f189ae712700029de89f0463a15659547b36552c7878d00b18a7312f935ed8d1"
+  },
+  "mc.chuva-1.ogg": {
+   "de": "laço de 25,7 s emendado de minecraft/sounds/ambient/weather/rain1..8.ogg (transições de 0,45 s)",
+   "sha256": "2188268e2d44e5d1392986bcc08fe1d4af6121c31bc5fd54cfdf6b90877f67bc"
+  },
+  "mc.musica.an_ordinary_day.ogg": {
+   "de": "minecraft/sounds/music/game/an_ordinary_day.ogg",
+   "sha256": "73d5a58f57c3577bb544fc6c3f70f08998185dee1033a62f08d6122cc66afc96"
+  },
+  "mc.musica.axolotl.ogg": {
+   "de": "minecraft/sounds/music/game/water/axolotl.ogg",
+   "sha256": "1dfb700d3a0376dcc0db1650cc382ec76a6d5a0e00ee5e4bd67dc1a1c31d5c99"
+  },
+  "mc.musica.clark.ogg": {
+   "de": "minecraft/sounds/music/game/clark.ogg",
+   "sha256": "ae021dbe9039aa08bfdbe86f33826c28b03fb2f1abce8761d2c3527817c883af"
+  },
+  "mc.musica.comforting_memories.ogg": {
+   "de": "minecraft/sounds/music/game/comforting_memories.ogg",
+   "sha256": "fb05d0c575857612d6a25db1b7e398079b2e951c3409252d979700b8cdb710bb"
+  },
+  "mc.musica.concrete_halls.ogg": {
+   "de": "minecraft/sounds/music/game/nether/concrete_halls.ogg",
+   "sha256": "c9d7b1e605bb3b1878b405e76e8f0f87fd332dc6f17b9a32317e95522f4d7c23"
+  },
+  "mc.musica.danny.ogg": {
+   "de": "minecraft/sounds/music/game/danny.ogg",
+   "sha256": "6cec76347bde8a8c0d74a8da2566e8fad2f87f12c14acb94e7255a9bf7111a76"
+  },
+  "mc.musica.dead_voxel.ogg": {
+   "de": "minecraft/sounds/music/game/nether/dead_voxel.ogg",
+   "sha256": "b7843d484ccdc0ca3697502792e4fb2de2c221d8e1aa46bd363e33bed282850a"
+  },
+  "mc.musica.dragon_fish.ogg": {
+   "de": "minecraft/sounds/music/game/water/dragon_fish.ogg",
+   "sha256": "fbf7cc0592d5845efb9d3fb73303fef3ea54f9c8750b28bf91e3a4164ebaff17"
+  },
+  "mc.musica.dry_hands.ogg": {
+   "de": "minecraft/sounds/music/game/dry_hands.ogg",
+   "sha256": "484346d89f2a08f28e51b4ad977ed6dfe132ae6ed6d41d93e0b4d18a8bb18bbc"
+  },
+  "mc.musica.floating_dream.ogg": {
+   "de": "minecraft/sounds/music/game/floating_dream.ogg",
+   "sha256": "beb12b0abb511690c0454be5454481f5ac19c7d37c1dd5ed07298015ed0ba6f7"
+  },
+  "mc.musica.haggstrom.ogg": {
+   "de": "minecraft/sounds/music/game/haggstrom.ogg",
+   "sha256": "3126d3c381a53e078c0ac597c80645d31b7d1d9fdb7851808334f5c333b3d5e2"
+  },
+  "mc.musica.key.ogg": {
+   "de": "minecraft/sounds/music/game/key.ogg",
+   "sha256": "f1e12d434b6836ab53ba86173bb0519da62d6ffb7eb4243a779ddf50444c1673"
+  },
+  "mc.musica.left_to_bloom.ogg": {
+   "de": "minecraft/sounds/music/game/left_to_bloom.ogg",
+   "sha256": "d092c12ed7a4143d8060beca578adab3b4145690ca98a2a473800330543eb712"
+  },
+  "mc.musica.living_mice.ogg": {
+   "de": "minecraft/sounds/music/game/living_mice.ogg",
+   "sha256": "c093b8a931aafd6b41822e664ee1024f62e8d7336b09d74fea91ceb6b2d4ecf4"
+  },
+  "mc.musica.mice_on_venus.ogg": {
+   "de": "minecraft/sounds/music/game/mice_on_venus.ogg",
+   "sha256": "f051c7ddcb602b15669197392d70c65bc0a36f52e49da7ee80a189f080c4f348"
+  },
+  "mc.musica.minecraft.ogg": {
+   "de": "minecraft/sounds/music/game/minecraft.ogg",
+   "sha256": "6fd495666af581b3aa76a9569fa8f2b55d7876ac51d60d4eabd436d72f8da985"
+  },
+  "mc.musica.oxygene.ogg": {
+   "de": "minecraft/sounds/music/game/oxygene.ogg",
+   "sha256": "13c26dd754e58404b0a595e6075e58565e2d8e7e5dd7206f8cf440165d14ac70"
+  },
+  "mc.musica.shuniji.ogg": {
+   "de": "minecraft/sounds/music/game/water/shuniji.ogg",
+   "sha256": "20ad80fc3eb84afeb641292498f7884c44bab97382b58c2132dd2a526844bf31"
+  },
+  "mc.musica.subwoofer_lullaby.ogg": {
+   "de": "minecraft/sounds/music/game/subwoofer_lullaby.ogg",
+   "sha256": "0a2c7f684cbc65d5f1416e9044e5838b5b113dda61e07556fc6ca9b438a7d5cc"
+  },
+  "mc.musica.sweden.ogg": {
+   "de": "minecraft/sounds/music/game/sweden.ogg",
+   "sha256": "f5169a831c71ecf5079cc74ba0283b95c068c3324b976e39037faecc7f51cb04"
+  },
+  "mc.musica.wet_hands.ogg": {
+   "de": "minecraft/sounds/music/game/wet_hands.ogg",
+   "sha256": "c7b4199793701b71330f11eda2d4dc192a9edd86e4911fd2bdcd2269fdd024b8"
+  },
+  "mc.submerso.ogg": {
+   "de": "minecraft/sounds/ambient/underwater/underwater_ambience.ogg",
+   "sha256": "6ae1610dd04e79abd1c77feb9a7a6550e25633cb76e8fb56016ce1047e7e2231"
+  },
+  "mc.submerso_add.bubbles1.ogg": {
+   "de": "minecraft/sounds/ambient/underwater/additions/bubbles1.ogg",
+   "sha256": "be2c2a1a5b706a2924a0a5ca45f9adc02acd0c3ab6e7b07b27768c738c5abcb7"
+  },
+  "mc.submerso_add.bubbles2.ogg": {
+   "de": "minecraft/sounds/ambient/underwater/additions/bubbles2.ogg",
+   "sha256": "5834bdae02894059da428d7af31a5ae23333f3a59280f1404446f9764bcd4398"
+  },
+  "mc.submerso_add.bubbles3.ogg": {
+   "de": "minecraft/sounds/ambient/underwater/additions/bubbles3.ogg",
+   "sha256": "2f0acf81d9185450d91cc1f9dcac423464422c92b55b49a042da01092e78921e"
+  },
+  "mc.submerso_add.bubbles4.ogg": {
+   "de": "minecraft/sounds/ambient/underwater/additions/bubbles4.ogg",
+   "sha256": "d133f92a99b05658c02b1870d51624d700638ef9040c7f69cf0d4567f60c216a"
+  },
+  "mc.submerso_add.bubbles5.ogg": {
+   "de": "minecraft/sounds/ambient/underwater/additions/bubbles5.ogg",
+   "sha256": "cd2f1fc59d90592c7c635b629f0691e35721187d0801e9db44b089e2eca3d81b"
+  },
+  "mc.submerso_add.bubbles6.ogg": {
+   "de": "minecraft/sounds/ambient/underwater/additions/bubbles6.ogg",
+   "sha256": "01353164d34e3e9bee613d24206f5a8fd48249ff4ba4795eebd513b864737829"
+  },
+  "mc.submerso_add.crackles1.ogg": {
+   "de": "minecraft/sounds/ambient/underwater/additions/crackles1.ogg",
+   "sha256": "eddd4527796a8404efc56c03f8819b647f3a7267b597e486090301909cf0e5a6"
+  },
+  "mc.submerso_add.crackles2.ogg": {
+   "de": "minecraft/sounds/ambient/underwater/additions/crackles2.ogg",
+   "sha256": "3c3ed198de363787e9a701e9d234753e9133c07ef4405c9849e5de58668ba4aa"
+  },
+  "mc.submerso_add.driplets1.ogg": {
+   "de": "minecraft/sounds/ambient/underwater/additions/driplets1.ogg",
+   "sha256": "4009ac76c6f4e576fafbe4f0d54fb5d701c370e786235777caf602ef5cdcfafc"
+  },
+  "mc.submerso_add.driplets2.ogg": {
+   "de": "minecraft/sounds/ambient/underwater/additions/driplets2.ogg",
+   "sha256": "fea7722acc8a20cf5dec053c1780f03fa14a1b1d0da40c978eef3830c3d23261"
+  },
+  "mc.submerso_add.water1.ogg": {
+   "de": "minecraft/sounds/ambient/underwater/additions/water1.ogg",
+   "sha256": "f5ee9c549a27e02f1a42839e4123c31bba1cf9347987578295492d2703111ba0"
+  },
+  "mc.submerso_add.water2.ogg": {
+   "de": "minecraft/sounds/ambient/underwater/additions/water2.ogg",
+   "sha256": "82da5d36ff7295299768825e5db3d94b9d1ba63b5fb2e23432b7d3fe4e08a8ea"
+  },
+  "mc.submerso_rara.animal1.ogg": {
+   "de": "minecraft/sounds/ambient/underwater/additions/animal1.ogg",
+   "sha256": "9cb0c4f7afc8a47d617e0e52f472f10dd0880dff145786eff4827f5dac9e6a57"
+  },
+  "mc.submerso_rara.animal2.ogg": {
+   "de": "minecraft/sounds/ambient/underwater/additions/animal2.ogg",
+   "sha256": "a4a783ca7f61c3d150accc473d2f047ab010d65367020d59ab40f97a5921ef77"
+  },
+  "mc.submerso_rara.bass_whale1.ogg": {
+   "de": "minecraft/sounds/ambient/underwater/additions/bass_whale1.ogg",
+   "sha256": "46293eb3edc04687c57ae5418f0cfb7c3699654b472494b1092c191094f71d45"
+  },
+  "mc.submerso_rara.bass_whale2.ogg": {
+   "de": "minecraft/sounds/ambient/underwater/additions/bass_whale2.ogg",
+   "sha256": "c790bbb84cffce18ecbcbe6d904e03be0f18f64c75d4ff0d91f40cd873312168"
+  },
+  "mc.submerso_rara.dark1.ogg": {
+   "de": "minecraft/sounds/ambient/underwater/additions/dark1.ogg",
+   "sha256": "014ace6f50da88de82bd02ffdf138045624d2bb92ab63883c11ab98d4bf68ea6"
+  },
+  "mc.submerso_rara.dark2.ogg": {
+   "de": "minecraft/sounds/ambient/underwater/additions/dark2.ogg",
+   "sha256": "4935ce9ce23d6dd5b9e75298eafebbfd1942a519fbac83bac145bcd5d560e4bb"
+  },
+  "mc.submerso_rara.dark3.ogg": {
+   "de": "minecraft/sounds/ambient/underwater/additions/dark3.ogg",
+   "sha256": "10a82673a33fa447ebceb5573dbf048321ef2a81ee980ee2461158c8f791b960"
+  },
+  "mc.submerso_rara.dark4.ogg": {
+   "de": "minecraft/sounds/ambient/underwater/additions/dark4.ogg",
+   "sha256": "c8add4309932e6a9d278ce5ba9c37572fe89f017e69eacd886bfb1a603991dc6"
+  },
+  "mc.submerso_rara.earth_crack.ogg": {
+   "de": "minecraft/sounds/ambient/underwater/additions/earth_crack.ogg",
+   "sha256": "cbecd43388179511beda1c717d9b95758f2db5ba4e6e0b69eb2b89db1c59039c"
+  },
+  "mc.trovao-1.ogg": {
+   "de": "minecraft/sounds/ambient/weather/thunder1.ogg",
+   "sha256": "d407a7b11be826d5c3b08199861cf6a85a93707690f7878c84ec0bebe4db93ed"
+  },
+  "mc.trovao-2.ogg": {
+   "de": "minecraft/sounds/ambient/weather/thunder2.ogg",
+   "sha256": "ecfb20e38b2e682464020309c38c65c102b91cb0342b139a35c3e21d6e5fff0d"
+  },
+  "mc.trovao-3.ogg": {
+   "de": "minecraft/sounds/ambient/weather/thunder3.ogg",
+   "sha256": "65acefae26577d5aad581bc6659021c0b5f7228fd897d4f996bb47bb9fad6253"
+  }
+ }
+}

@@ -32,8 +32,7 @@
   "ambiente.carro-2.ogg"
  ],
  "ambiente.chuva": [
-  "ambiente.chuva-1.ogg",
-  "ambiente.chuva-2.ogg"
+  "mc.chuva-1.ogg"
  ],
  "ambiente.cigarras": [
   "ambiente.cigarras-1.ogg"
@@ -103,11 +102,7 @@
   "ambiente.sapo-3.ogg"
  ],
  "ambiente.submerso": [
-  "mar.under_reef.ogg",
-  "ambiente.submerso-1.ogg",
-  "ambiente.submerso-2.ogg",
-  "ambiente.submerso-3.ogg",
-  "ambiente.submerso-4.ogg"
+  "mc.submerso.ogg"
  ],
  "ambiente.vento": [
   "ambiente.vento-3.ogg",
@@ -292,15 +287,29 @@
   "mergulho-9.ogg"
  ],
  "musica.dia": [
-  "musica.dia-1.ogg",
-  "musica.dia-2.ogg"
+  "mc.musica.minecraft.ogg",
+  "mc.musica.clark.ogg",
+  "mc.musica.sweden.ogg",
+  "mc.musica.subwoofer_lullaby.ogg",
+  "mc.musica.living_mice.ogg",
+  "mc.musica.haggstrom.ogg",
+  "mc.musica.danny.ogg",
+  "mc.musica.wet_hands.ogg",
+  "mc.musica.an_ordinary_day.ogg",
+  "mc.musica.left_to_bloom.ogg"
  ],
  "musica.noite": [
-  "musica.noite-1.ogg",
-  "musica.noite-2.ogg"
+  "mc.musica.mice_on_venus.ogg",
+  "mc.musica.dry_hands.ogg",
+  "mc.musica.oxygene.ogg",
+  "mc.musica.key.ogg",
+  "mc.musica.floating_dream.ogg",
+  "mc.musica.comforting_memories.ogg"
  ],
  "musica.zona": [
-  "musica.zona-1.ogg"
+  "musica.zona-1.ogg",
+  "mc.musica.dead_voxel.ogg",
+  "mc.musica.concrete_halls.ogg"
  ],
  "swim": [
   "mar.swim.ogg",
@@ -876,9 +885,9 @@
   "tiro-2.ogg"
  ],
  "thunder": [
-  "trovao-1.ogg",
-  "trovao-2.ogg",
-  "trovao-3.ogg"
+  "mc.trovao-1.ogg",
+  "mc.trovao-2.ogg",
+  "mc.trovao-3.ogg"
  ],
  "ambiente.surf_far": [
   "mar.surf_far.ogg"
@@ -964,5 +973,60 @@
  ],
  "mar.splash": [
   "mar.splash.ogg"
+ ],
+ "musica.agua": [
+  "mc.musica.axolotl.ogg",
+  "mc.musica.dragon_fish.ogg",
+  "mc.musica.shuniji.ogg"
+ ],
+ "ambiente.caverna": [
+  "mc.caverna-1.ogg",
+  "mc.caverna-2.ogg",
+  "mc.caverna-3.ogg",
+  "mc.caverna-4.ogg",
+  "mc.caverna-5.ogg",
+  "mc.caverna-6.ogg",
+  "mc.caverna-7.ogg",
+  "mc.caverna-8.ogg",
+  "mc.caverna-9.ogg",
+  "mc.caverna-10.ogg",
+  "mc.caverna-11.ogg",
+  "mc.caverna-12.ogg",
+  "mc.caverna-13.ogg",
+  "mc.caverna-14.ogg",
+  "mc.caverna-15.ogg",
+  "mc.caverna-16.ogg",
+  "mc.caverna-17.ogg",
+  "mc.caverna-18.ogg",
+  "mc.caverna-19.ogg",
+  "mc.caverna-20.ogg",
+  "mc.caverna-21.ogg",
+  "mc.caverna-22.ogg",
+  "mc.caverna-23.ogg"
+ ],
+ "ambiente.submerso_add": [
+  "mc.submerso_add.bubbles1.ogg",
+  "mc.submerso_add.bubbles2.ogg",
+  "mc.submerso_add.bubbles3.ogg",
+  "mc.submerso_add.bubbles4.ogg",
+  "mc.submerso_add.bubbles5.ogg",
+  "mc.submerso_add.bubbles6.ogg",
+  "mc.submerso_add.crackles1.ogg",
+  "mc.submerso_add.crackles2.ogg",
+  "mc.submerso_add.driplets1.ogg",
+  "mc.submerso_add.driplets2.ogg",
+  "mc.submerso_add.water1.ogg",
+  "mc.submerso_add.water2.ogg"
+ ],
+ "ambiente.submerso_rara": [
+  "mc.submerso_rara.animal1.ogg",
+  "mc.submerso_rara.animal2.ogg",
+  "mc.submerso_rara.bass_whale1.ogg",
+  "mc.submerso_rara.bass_whale2.ogg",
+  "mc.submerso_rara.dark1.ogg",
+  "mc.submerso_rara.dark2.ogg",
+  "mc.submerso_rara.dark3.ogg",
+  "mc.submerso_rara.dark4.ogg",
+  "mc.submerso_rara.earth_crack.ogg"
  ]
 }

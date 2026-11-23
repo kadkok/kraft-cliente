@@ -734,8 +734,8 @@ function refreshPlayers() {
 // ---- som do lugar ---------------------------------------------------------------------------
 // Algumas vezes por segundo olha em volta (teto, água, árvores, relva) e entrega esse retrato ao motor de som,
 // que decide o vento, os pássaros, o eco de caverna e o resto.
-const place = { playing: false, underwater: false, enclosed: 0, night: 0, alt: 0, speed: 0, fallSpeed: 0, water: 0, seaWater: 0, waveEnergy: 0, rain: 0, wind: 0, trees: 0, grass: 0, beach: 0, shoreX: 0.83, shoreZ: 0.55, shoreDist: 60, seaY: SEA, depthBelowSurface: 0, nearPier: false, zone: false, nano: false, nearGround: true, dripPos: null };
-const heard = { enclosed: 0, water: 0, seaWater: 0, trees: 0, grass: 0, beach: 0 };
+const place = { playing: false, underwater: false, enclosed: 0, night: 0, alt: 0, speed: 0, fallSpeed: 0, water: 0, seaWater: 0, waveEnergy: 0, rain: 0, wind: 0, trees: 0, grass: 0, beach: 0, shoreX: 0.83, shoreZ: 0.55, shoreDist: 60, seaY: SEA, depthBelowSurface: 0, nearPier: false, zone: false, nano: false, nearGround: true, dripPos: null, caverna: 0 };
+const heard = { enclosed: 0, water: 0, seaWater: 0, trees: 0, grass: 0, beach: 0, caverna: 0 };
 let placeT = 0;
 // Primeiro bloco não-vazio da coluna, de `de` para baixo, também no subsolo novo (y < 0, profundidade em dobro):
 // world.topSolid só desce até 0 (e −1 lá quer dizer "nada"). null = nada ou pedaço não carregado.
@@ -788,6 +788,8 @@ function surveyPlace(cx, cy, cz) {
   const ground = topoAbaixo(bx, bz, by);
   place.nearGround = ground !== null && by - ground < 9;
   heard.enclosed = roof / 5;
+  // caverna (som do Minecraft, game/audio): no plano normal, abaixo do nível do mar e sem luz do céu na cabeça
+  heard.caverna = game.dim === 0 && by < SEA - 2 && ((world.getLight(bx, by + 1, bz) | 0) & 15) <= 2 ? 1 : 0;
   heard.water = Math.min(1, water / 2.2);
   heard.seaWater = seaCols >= 4 ? Math.min(1, seaWater / 2.0) : 0;
   heard.trees = n ? Math.min(1, trees / n * 3) : 0;
