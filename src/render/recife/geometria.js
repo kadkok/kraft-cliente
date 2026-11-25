@@ -2095,3 +2095,465 @@ export function createConch( rng, lod ) {
 	return b.build();
 
 }
+
+// ---------------------------------------------------------------------------
+// Fantasy underwater biome additions: Towering Kelp, Iridescent Foliage,
+// Magenta Ground Cover, Rock Arches + Floating Boulders, Sunken Ship Hull,
+// Stone Whale-Fluke Sculpture, Manta Rays & Reef Fish Schools.
+// ---------------------------------------------------------------------------
+
+// Towering giant kelp column (Macrocystis pyrifera): 2-3 intertwined helical stipes rising to H = 1.0 m
+// at scale 1 (scaled to 6..14 m in recife.js), bearing corrugated leaf blades and gas bladders.
+// aData = ( height t 0..1, ao, part (0 stipe, 1 blade, 2 gas bladder), random )
+export function createKelpColumn( rng, lod ) {
+
+	const b = new MeshBuilder();
+	const stipes = lod === 2 ? 2 : 3;
+	const segs = [ 18, 10, 6 ][ lod ];
+	const bladeCount = [ 26, 14, 7 ][ lod ];
+	const widen = [ 1, 1.35, 1.85 ][ lod ];
+	const H = 1.0;
+
+	for ( let s = 0; s < stipes; s ++ ) {
+
+		const phase = ( s / stipes ) * TAU + rng() * 0.5;
+		const rad0 = 0.035 + rng() * 0.02;
+		const pts = [];
+		for ( let k = 0; k <= segs; k ++ ) {
+
+			const t = k / segs;
+			const ang = phase + t * TAU * 1.35;
+			const r = rad0 * ( 0.35 + 0.65 * Math.sin( t * Math.PI ) );
+			pts.push( new THREE.Vector3( Math.cos( ang ) * r, - 0.015 + t * H, Math.sin( ang ) * r ) );
+
+		}
+
+		const w0 = rng();
+		tube( b, pts, pts.map( ( _, k ) => 0.0055 * widen * ( 1.15 - 0.45 * ( k / segs ) ) ), {
+			sides: lod === 0 ? 5 : 3,
+			cap: true,
+			data: ( k ) => [ k / segs, 0, w0 ],
+		} );
+
+		for ( let k = 0; k < bladeCount; k ++ ) {
+
+			const t = 0.08 + 0.9 * ( ( k + rng() * 0.65 ) / bladeCount );
+			const f = t * segs, i0 = Math.min( segs - 1, Math.floor( f ) );
+			const p = pts[ i0 ].clone().lerp( pts[ i0 + 1 ], f - i0 );
+			const ya = phase + k * 2.39996 + ( rng() - 0.5 ) * 0.35;
+			const droop = 0.18 - 0.32 * t;
+			const len = ( 0.11 + 0.07 * Math.sin( t * Math.PI ) ) * ( 0.85 + 0.3 * rng() );
+			const bw = ( 0.022 + 0.012 * Math.sin( t * Math.PI ) ) * widen;
+			const ld = new THREE.Vector3( Math.cos( ya ), droop, Math.sin( ya ) ).normalize();
+			const out = new THREE.Vector3( - Math.sin( ya ), 0.25, Math.cos( ya ) ).normalize();
+			const wr = rng();
+
+			if ( lod === 0 && k % 2 === 0 ) {
+
+				const first = b.count, fi = b.index.length;
+				const bc = p.clone().addScaledVector( ld, 0.008 );
+				blob( b, 0, ( d, o ) => {
+
+					o.set( bc.x + d.x * 0.007, bc.y + d.y * 0.009, bc.z + d.z * 0.007 );
+					return [ t, 2, wr ];
+
+				} );
+				smoothNormals( b, first, fi );
+
+			}
+
+			const bSegs = lod === 0 ? 3 : 1;
+			const firstV = b.count;
+			blade( b, p, ld, out, len, bw, - 0.035 * len, bSegs, 0.55 + 0.45 * t, wr );
+			for ( let v = firstV; v < b.count; v ++ ) {
+
+				const localT = b.data[ v * 4 ];
+				b.data[ v * 4 ] = clamp( t + localT * 0.08, 0, 1 );
+				b.data[ v * 4 + 2 ] = 1;
+
+			}
+
+		}
+
+	}
+
+	return b.build( { ao: { radius: 0.14, strength: 0.65 } } );
+
+}
+
+// Iridescent purple/pink fantasy sea-foliage: flaring ruffled ribbons & glowing chalices.
+// aData = ( height t 0..1, ao, 1 on ruffled luminescent edge, random )
+export function createIridescentFoliage( rng, lod ) {
+
+	const b = new MeshBuilder();
+	const n = [ 9, 6, 4 ][ lod ];
+	const nu = [ 8, 5, 3 ][ lod ], nv = [ 6, 3, 2 ][ lod ];
+	for ( let k = 0; k < n; k ++ ) {
+
+		const az = ( k / n ) * TAU + ( rng() - 0.5 ) * 0.35;
+		const ring = k < 3 ? 0.04 : 0.11 + rng() * 0.07;
+		const tilt = k < 3 ? rand( rng, 0.18, 0.38 ) : rand( rng, 0.42, 0.78 );
+		const H = rand( rng, 0.42, 0.72 ) * ( k < 3 ? 1.12 : 0.92 );
+		const W = rand( rng, 0.16, 0.28 );
+		const wr = rng();
+		const ca = Math.cos( az ), sa = Math.sin( az );
+		const at = ( u, v, sgn, out ) => {
+
+			const x0 = ( u - 0.5 ) * 2;
+			const e = Math.abs( x0 );
+			const w = W * ( 0.22 + 0.78 * Math.sin( Math.pow( v, 0.75 ) * Math.PI * 0.88 ) );
+			const ruffle = Math.sin( u * Math.PI * 5 + k * 1.7 + v * 4 ) * 0.032 * e * v;
+			const arch = tilt * v * H + 0.11 * v * v * H;
+			const y = v * H * ( 1 - 0.22 * tilt ) - 0.04 * e * e * v;
+			const lx = x0 * w;
+			const lz = ring + arch + ruffle + sgn * 0.0045 * ( 1 - 0.5 * v );
+			out.set( lx * ca - lz * sa, y - 0.01, lx * sa + lz * ca );
+			return [ v, e > 0.62 || v > 0.82 ? 1 : 0, wr ];
+
+		};
+
+		const first = b.count, fi = b.index.length;
+		sheet( b, nu, nv, ( u, v, out ) => at( u, v, 1, out ), false );
+		sheet( b, nu, nv, ( u, v, out ) => at( 1 - u, v, - 1, out ), false );
+		smoothNormals( b, first, fi );
+
+	}
+
+	return b.build( { ao: { radius: 0.12, strength: 0.85 } } );
+
+}
+
+// Magenta bioluminescent ground cover: low velvety rosettes and glowing polyp pads hugging the seabed.
+// aData = ( t 0..1 from center to rim, ao, 1 on glowing rim/polyp, random )
+export function createMagentaCover( rng, lod ) {
+
+	const b = new MeshBuilder();
+	const pads = [ 14, 8, 5 ][ lod ];
+	const sides = [ 9, 6, 5 ][ lod ];
+	for ( let i = 0; i < pads; i ++ ) {
+
+		const a = i === 0 ? 0 : rng() * TAU;
+		const dist = i === 0 ? 0 : Math.sqrt( rng() ) * 0.48;
+		const cx = Math.cos( a ) * dist, cz = Math.sin( a ) * dist;
+		const rad = rand( rng, 0.11, 0.22 ) * ( 1 - dist * 0.55 );
+		const h0 = 0.02 + ( 1 - dist ) * 0.04 + rng() * 0.025;
+		const wr = rng();
+		const first = b.count, fi = b.index.length;
+		const centerV = b.vertex( new THREE.Vector3( cx, h0 + 0.022, cz ), _up, 0.2, 1, 0, wr );
+		for ( let s = 0; s < sides; s ++ ) {
+
+			const ang = ( s / sides ) * TAU;
+			const wave = 1 + 0.22 * Math.sin( ang * 4 + i * 2.1 );
+			const rr = rad * wave;
+			const py = h0 + 0.015 * Math.cos( ang * 4 + i );
+			b.vertex( new THREE.Vector3( cx + Math.cos( ang ) * rr, py, cz + Math.sin( ang ) * rr ), _up, 1, 0.95, 1, wr );
+
+		}
+
+		for ( let s = 0; s < sides; s ++ ) {
+
+			b.tri( centerV, first + 1 + ( ( s + 1 ) % sides ), first + 1 + s );
+
+		}
+
+		b.backfaces( first, fi );
+		smoothNormals( b, first, fi );
+
+	}
+
+	return b.build( { ao: { radius: 0.08, strength: 0.75 } } );
+
+}
+
+// Underwater rock canyon arch / overhang + tethered floating boulder.
+// About 1.0 m tall and 1.3 m span at scale 1 (scaled to 4.5..7.5 m in recife.js).
+// aData = ( height t 0..1, ao, part (0 rock arch, 1 floating boulder + kelp tether), random )
+export function createRockArch( rng, lod ) {
+
+	const b = new MeshBuilder();
+	const steps = [ 16, 10, 6 ][ lod ];
+	const sides = [ 9, 6, 5 ][ lod ];
+	const nz = waveNoise( rng, 5, 2.2, 5.5 );
+	const span = 0.68, archH = 0.78;
+	const pts = [], radii = [];
+
+	for ( let i = 0; i <= steps; i ++ ) {
+
+		const u = i / steps;
+		const x = ( u - 0.5 ) * 2 * span;
+		const y = - 0.06 + Math.sin( u * Math.PI ) * archH;
+		const z = Math.sin( u * Math.PI * 2 ) * 0.09;
+		pts.push( new THREE.Vector3( x, y, z ) );
+		const pillar = 1 - 0.42 * Math.sin( u * Math.PI );
+		radii.push( ( 0.16 + 0.05 * nz( x * 2, y * 2, z * 2 ) ) * pillar );
+
+	}
+
+	const firstArch = b.count;
+	tube( b, pts, radii, {
+		sides,
+		cap: true,
+		ellipse: 0.78,
+		data: ( i ) => [ clamp( pts[ i ].y / ( archH + 0.2 ), 0, 1 ), 0, 0.25 ],
+	} );
+	for ( let v = firstArch; v < b.count; v ++ ) {
+
+		const vx = b.position[ v * 3 ], vy = b.position[ v * 3 + 1 ], vz = b.position[ v * 3 + 2 ];
+		const d = 0.035 * nz( vx * 3.5, vy * 3.5, vz * 3.5 );
+		b.position[ v * 3 ] += b.normal[ v * 3 ] * d;
+		b.position[ v * 3 + 1 ] += b.normal[ v * 3 + 1 ] * d;
+		b.position[ v * 3 + 2 ] += b.normal[ v * 3 + 2 ] * d;
+
+	}
+
+	// Floating boulder suspended above the arch crown + kelp tether
+	const bx = rand( rng, - 0.18, 0.18 ), by = archH + 0.34, bz = rand( rng, - 0.12, 0.12 );
+	const tetherPts = [
+		new THREE.Vector3( bx * 0.5, archH - 0.05, bz * 0.5 ),
+		new THREE.Vector3( bx * 0.8 + 0.03, archH + 0.14, bz * 0.8 ),
+		new THREE.Vector3( bx, by - 0.08, bz ),
+	];
+	tube( b, tetherPts, [ 0.018, 0.014, 0.02 ], {
+		sides: 4,
+		cap: false,
+		data: ( i ) => [ 0.75 + i * 0.1, 1, 0.6 ],
+	} );
+
+	const firstB = b.count, fiB = b.index.length;
+	blob( b, lod === 0 ? 2 : 1, ( d, out ) => {
+
+		const k = 1 + 0.22 * nz( d.x * 2.4 + 4, d.y * 2.4, d.z * 2.4 );
+		out.set( bx + d.x * 0.21 * k, by + d.y * 0.16 * k, bz + d.z * 0.19 * k );
+		return [ clamp( 0.8 + d.y * 0.2, 0, 1 ), d.y > 0.25 ? 1 : 0, 0.8 ];
+
+	} );
+	smoothNormals( b, firstB, fiB );
+	return b.build( { ao: { radius: 0.24, strength: 0.9 } } );
+
+}
+
+// Sunken wooden ship hull set piece: curved keel, broken hull planking, exposed timber ribs,
+// tilted mast stub, and coral encrustations. ~1.6 m long at scale 1 (scaled to 5.5..8.0 m in recife.js).
+// aData = ( height t 0..1, ao, part (0 hull planks, 1 ribs/keel/mast, 2 coral growth), random )
+export function createSunkenShipHull( rng, lod ) {
+
+	const b = new MeshBuilder();
+	const nu = [ 14, 8, 5 ][ lod ], nv = [ 6, 4, 2 ][ lod ];
+	const L = 1.55, W = 0.46, H = 0.42;
+
+	// Starboard & port hull planking with a breached midsection and listing angle
+	for ( const side of [ - 1, 1 ] ) {
+
+		const first = b.count, fi = b.index.length;
+		sheet( b, nu, nv, ( u, v, out ) => {
+
+			const x = ( u - 0.5 ) * L;
+			const taper = Math.max( 0.06, 1 - Math.pow( Math.abs( u - 0.48 ) * 1.98, 2.1 ) );
+			const breach = side > 0 && u > 0.38 && u < 0.68 ? 1 - 0.45 * Math.sin( ( ( u - 0.38 ) / 0.3 ) * Math.PI ) : 1;
+			const vv = v * breach;
+			const flare = Math.sin( vv * Math.PI * 0.58 );
+			const y = - 0.02 + Math.pow( vv, 1.15 ) * H * ( 1 + 0.28 * Math.pow( u - 0.5, 2 ) );
+			const z = side * W * taper * ( 0.18 + 0.82 * flare );
+			// Slight 14-degree roll list on the seabed
+			const list = 0.24;
+			const ry = y * Math.cos( list ) - z * Math.sin( list );
+			const rz = y * Math.sin( list ) + z * Math.cos( list );
+			out.set( x, ry, rz );
+			return [ clamp( ry / H, 0, 1 ), 0, ( Math.floor( vv * 6 ) % 2 ) * 0.35 ];
+
+		}, true );
+		smoothNormals( b, first, fi );
+
+	}
+
+	// Curved exposed timber ribs along the hull interior
+	const ribCount = [ 9, 6, 4 ][ lod ];
+	const list = 0.24;
+	for ( let r = 0; r < ribCount; r ++ ) {
+
+		const u = 0.12 + 0.76 * ( r / ( ribCount - 1 ) );
+		const x = ( u - 0.5 ) * L;
+		const taper = Math.max( 0.1, 1 - Math.pow( Math.abs( u - 0.48 ) * 1.98, 2.1 ) );
+		const ribPts = [];
+		const rSteps = lod === 0 ? 6 : 4;
+		for ( let k = 0; k <= rSteps; k ++ ) {
+
+			const s = ( k / rSteps - 0.5 ) * 2;
+			const vv = Math.abs( s );
+			const y = - 0.01 + Math.pow( vv, 1.2 ) * H * 1.03;
+			const z = Math.sign( s ) * W * taper * ( 0.16 + 0.82 * Math.sin( vv * Math.PI * 0.58 ) );
+			ribPts.push( new THREE.Vector3( x, y * Math.cos( list ) - z * Math.sin( list ), y * Math.sin( list ) + z * Math.cos( list ) ) );
+
+		}
+
+		tube( b, ribPts, ribPts.map( () => 0.018 ), {
+			sides: 4,
+			cap: true,
+			data: () => [ 0.5, 1, 0.5 ],
+		} );
+
+	}
+
+	// Keel spine + tilted broken mainmast + bowsprit
+	tube( b, [ new THREE.Vector3( - L * 0.48, 0.01, 0 ), new THREE.Vector3( L * 0.52, 0.08, 0.02 ) ], [ 0.028, 0.024 ], {
+		sides: 4, cap: true, data: () => [ 0.1, 1, 0.2 ],
+	} );
+	tube( b, [ new THREE.Vector3( 0.08, 0.02, 0.02 ), new THREE.Vector3( 0.14, 0.78, - 0.18 ) ], [ 0.032, 0.018 ], {
+		sides: 5, cap: true, data: ( i, t ) => [ t, 1, 0.7 ],
+	} );
+
+	return b.build( { ao: { radius: 0.22, strength: 0.9 } } );
+
+}
+
+// Stone whale-fluke sculpture set piece: monumental carved stone whale tail emerging from the seafloor.
+// ~1.0 m tall and 1.1 m wide at scale 1 (scaled to 5.0..7.5 m in recife.js).
+// aData = ( height t 0..1, ao, part (0 ancient carved stone, 1 glowing mossy/gold crest & runes), random )
+export function createWhaleFlukeSculpture( rng, lod ) {
+
+	const b = new MeshBuilder();
+	const nz = waveNoise( rng, 4, 2.5, 6.0 );
+
+	// Stepped ancient circular stone plinth at the base
+	const firstP = b.count, fiP = b.index.length;
+	lathe( b, [
+		{ r: 0.34, y: - 0.04, d: [ 0, 0, 0.1 ] },
+		{ r: 0.31, y: 0.10, d: [ 0.12, 1, 0.1 ] },
+		{ r: 0.22, y: 0.12, d: [ 0.15, 0, 0.2 ] },
+		{ r: 0.18, y: 0.24, d: [ 0.25, 1, 0.2 ] },
+		{ r: 0.01, y: 0.25, d: [ 0.26, 0, 0.2 ] },
+	], lod === 0 ? 12 : 7, ( phi ) => 1 + 0.05 * Math.sin( phi * 6 ) );
+	smoothNormals( b, firstP, fiP );
+
+	// Sweeping tail stock rising and curving backward
+	const stockSteps = [ 10, 6, 4 ][ lod ];
+	const stockPts = [], stockRadii = [];
+	for ( let i = 0; i <= stockSteps; i ++ ) {
+
+		const t = i / stockSteps;
+		stockPts.push( new THREE.Vector3( 0, 0.18 + t * 0.56, - 0.04 + Math.pow( t, 1.7 ) * 0.18 ) );
+		stockRadii.push( 0.15 * ( 1 - 0.45 * t ) );
+
+	}
+
+	tube( b, stockPts, stockRadii, {
+		sides: lod === 0 ? 8 : 5,
+		cap: false,
+		ellipse: 0.68,
+		data: ( i, t ) => [ 0.2 + t * 0.5, i % 2 === 0 ? 1 : 0, 0.4 ],
+	} );
+
+	// Twin carved fluke lobes sweeping left and right with central V-notch
+	const nu = [ 10, 6, 4 ][ lod ], nv = [ 5, 3, 2 ][ lod ];
+	for ( const side of [ - 1, 1 ] ) {
+
+		const firstL = b.count, fiL = b.index.length;
+		const at = ( u, v, sgn, out ) => {
+
+			// u: 0 at center notch .. 1 at wingtip; v: 0 trailing edge (notch) .. 1 leading upper edge
+			const span = 0.56;
+			const x = side * ( 0.02 + Math.pow( u, 0.92 ) * span );
+			const chord = 0.24 * ( 1 - 0.72 * Math.pow( u, 1.35 ) ) * ( 0.35 + 0.65 * Math.sin( Math.min( 1, u * 4.5 ) * Math.PI * 0.5 ) );
+			const sweepY = 0.70 + 0.18 * Math.sin( u * Math.PI * 0.75 ) + 0.08 * u * u;
+			const sweepZ = 0.14 + 0.14 * Math.pow( u, 1.4 );
+			const profile = Math.sin( v * Math.PI );
+			const th = 0.055 * ( 1 - 0.68 * u ) * profile;
+			const y = sweepY + ( v - 0.45 ) * chord * 0.88;
+			const z = sweepZ - ( v - 0.45 ) * chord * 0.45 + sgn * th + 0.008 * nz( x * 4, y * 4, 0 );
+			out.set( x, y, z );
+			return [ clamp( y, 0, 1 ), v > 0.72 || u > 0.82 ? 1 : 0, 0.65 ];
+
+		};
+
+		sheet( b, nu, nv, ( u, v, out ) => at( u, v, 1, out ), false );
+		sheet( b, nu, nv, ( u, v, out ) => at( 1 - u, v, - 1, out ), false );
+		smoothNormals( b, firstL, fiL );
+
+	}
+
+	return b.build( { ao: { radius: 0.2, strength: 0.9 } } );
+
+}
+
+// Procedural Manta Ray for GPU-animated swimming: diamond wings, cephalic fins, whip tail.
+// aData = ( signed wingspan -1..1 for wing flap, body length 0..1 nose to tail, dorsal/ventral 0..1, 0 )
+export function createMantaRay( lod = 0 ) {
+
+	const b = new MeshBuilder();
+	const nu = lod === 0 ? 12 : 6, nv = lod === 0 ? 8 : 4;
+	const W = 1.35, L = 1.05;
+	const at = ( u, v, sgn, out ) => {
+
+		const x0 = ( u - 0.5 ) * 2; // -1..1 across wings
+		const ax = Math.abs( x0 );
+		// Wing leading and trailing curves
+		const zLead = - 0.42 * ( 1 - Math.pow( ax, 1.35 ) ) + 0.18 * ax;
+		const zTrail = 0.48 * Math.pow( Math.max( 0, 1 - ax * 1.05 ), 1.6 ) + 0.12 * ax;
+		const z = zLead + v * ( zTrail - zLead );
+		const thickness = 0.095 * Math.pow( Math.max( 0, 1 - ax ), 1.4 ) * Math.sin( v * Math.PI );
+		// Cephalic horn fins projecting forward near |x0| ~ 0.18
+		const horn = v < 0.18 && ax > 0.08 && ax < 0.28 ? - 0.14 * ( 1 - v / 0.18 ) : 0;
+		const y = sgn * thickness * ( sgn > 0 ? 1.15 : 0.75 );
+		out.set( x0 * W, y, z * L + horn );
+		return [ x0, v, sgn > 0 ? 1 : 0 ];
+
+	};
+
+	const first = b.count, fi = b.index.length;
+	sheet( b, nu, nv, ( u, v, out ) => at( u, v, 1, out ), false );
+	sheet( b, nu, nv, ( u, v, out ) => at( 1 - u, v, - 1, out ), false );
+	smoothNormals( b, first, fi );
+
+	// Long whip tail
+	tube( b, [ new THREE.Vector3( 0, 0, 0.42 ), new THREE.Vector3( 0, - 0.02, 1.25 ) ], [ 0.022, 0.004 ], {
+		sides: 4, cap: true, data: ( i, t ) => [ 0, 0.5 + t * 0.5, 1 ],
+	} );
+	return b.build();
+
+}
+
+// Procedural tropical reef fish for GPU-animated schools: fusiform body + dorsal fin + forked tail.
+// aData = ( body progression 0 nose .. 1 tail for S-wave swimming, ao, stripe/fin flag, 0 )
+export function createReefFish( lod = 0 ) {
+
+	const b = new MeshBuilder();
+	const segs = lod === 0 ? 8 : 5, sides = lod === 0 ? 6 : 4;
+	const L = 0.34;
+	const base = b.count;
+	for ( let i = 0; i <= segs; i ++ ) {
+
+		const t = i / segs;
+		const z = ( t - 0.35 ) * L;
+		// Fusiform body narrowing at the caudal peduncle (t ~ 0.78), flaring into forked tail (t > 0.8)
+		const isTail = t > 0.78;
+		const bodyEnv = isTail ? 0.18 + ( t - 0.78 ) * 2.4 : Math.sin( Math.pow( t / 0.78, 0.82 ) * Math.PI );
+		const ry = 0.072 * bodyEnv;
+		const rx = isTail ? 0.008 : 0.036 * Math.sin( Math.min( 1, t / 0.78 ) * Math.PI );
+		for ( let j = 0; j < sides; j ++ ) {
+
+			const a = ( j / sides ) * TAU;
+			const ca = Math.cos( a ), sa = Math.sin( a );
+			const notch = isTail && Math.abs( sa ) < 0.35 ? - 0.028 * ( t - 0.78 ) / 0.22 : 0;
+			_p.set( ca * rx, sa * ry, z + notch );
+			_n.set( ca / Math.max( rx, 0.004 ), sa / Math.max( ry, 0.004 ), 0 ).normalize();
+			b.vertex( _p, _n, t, 1, isTail ? 1 : 0, 0 );
+
+		}
+
+	}
+
+	for ( let i = 0; i < segs; i ++ ) {
+
+		for ( let j = 0; j < sides; j ++ ) {
+
+			const a = base + i * sides + j, a1 = base + i * sides + ( ( j + 1 ) % sides );
+			b.tri( a, a1, a + sides );
+			b.tri( a1, a1 + sides, a + sides );
+
+		}
+
+	}
+
+	return b.build();
+
+}

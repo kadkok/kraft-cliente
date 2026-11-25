@@ -21,6 +21,8 @@ import { MC_BASE } from '../../shared/mc-estados.js';
 import { BAG_SLOTS, HAND_REACH, itemName, itemKey, bagTotal, bagUsed, cleanBag, inHandReach } from '../../shared/items.js';
 import { h } from '../ui/ui.js';
 import { isTesouro, aparenciaDe, valorDe, textoDoValor, tesouroDe, NOME_RARIDADE } from '../../shared/tesouros.js';
+import { isObj } from '../../shared/objetos.js';
+import { createObjIcones } from '../ui/obj-icones.js';
 
 const FLY = 0.2;           // segundos do item voando até quem pegou
 const FEED_MS = 2600;      // quanto tempo o "+3 Terra" fica na tela
@@ -55,6 +57,10 @@ export function initItems({ game, world, player, net, ui, input, scene, store, l
   let sel = -1;                             // espaço escolhido na mochila
   const listeners = [];
   const emit = (k, v) => { for (const f of listeners) f(k, v); };
+  // objetos (carne, couro, corda, sela…): itens que não são blocos; os ícones são provisórios (ui/obj-icones.js)
+  const objIcones = createObjIcones();
+  game.objIcones = objIcones;
+  game.hotbarObj = new Array(9).fill(0);        // o objeto de cada espaço da barra (0 = bloco ou vazio); game.hotbar fica 0 nesses
   const now = () => performance.now() / 1000;
 
   // ---- espelho do que o servidor manda -----------------------------------------------------------------------------
@@ -170,7 +176,10 @@ export function initItems({ game, world, player, net, ui, input, scene, store, l
       }
       return t;
     }
+    const objTexs = new Map();
+    function objTex(s) { let t = objTexs.get(s); if (!t) { t = new THREE.CanvasTexture(objIcones.icone(s, 64)); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; objTexs.set(s, t); } return t; }
     function materials(b, s) {
+      if (isObj(b, s)) return new THREE.MeshLambertMaterial({ map: objTex(s), alphaTest: 0.35, side: THREE.DoubleSide });   // objeto: o ícone em duas plaquinhas cruzadas
       if (s >= MC_BASE && game.mcPaleta) return new THREE.MeshLambertMaterial({ map: mcTex(s), alphaTest: 0.4 });
       const kind = KIND[b], cut = kind === K_CUTOUT || kind === K_CROSS;
       if (kind === K_CROSS) return new THREE.MeshLambertMaterial({ map: tex(TEX[b * 6]), alphaTest: 0.5, side: THREE.DoubleSide });
@@ -188,7 +197,7 @@ export function initItems({ game, world, player, net, ui, input, scene, store, l
       let cap = Math.max(16, p.cap);
       while (cap < need) cap *= 2;
       p.mats ||= materials(p.b, p.s);
-      const mesh = new THREE.InstancedMesh(p.s < MC_BASE && KIND[p.b] === K_CROSS ? crossGeo : boxGeo, p.mats, cap);
+      const mesh = new THREE.InstancedMesh(isObj(p.b, p.s) || (p.s < MC_BASE && KIND[p.b] === K_CROSS) ? crossGeo : boxGeo, p.mats, cap);
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(cap * 3).fill(1), 3);
       mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
@@ -207,7 +216,7 @@ export function initItems({ game, world, player, net, ui, input, scene, store, l
     return {
       begin() { for (const p of pools.values()) p.n = 0; },
       put(x, y, z, yaw, scale, b, s, n, light) {
-        if (!game.icons) return;
+        if (!game.icons && !isObj(b, s)) return;
         if (isTesouro(b)) { b = aparenciaDe(b); s = 0; }   // tesouro: cubinho com o desenho da aparência
         const key = s >= MC_BASE ? itemKey(b, s) : b;
         let p = pools.get(key);
@@ -252,7 +261,14 @@ export function initItems({ game, world, player, net, ui, input, scene, store, l
   // Fora do criativo a barra de atalhos são os 9 primeiros espaços da mochila, com a contagem em cada um.
   function hotbarFromBag() {
     const on = !!game.modeRules && !game.modeRules.criativo;
-    if (on) for (let i = 0; i < 9; i++) { const e = bag.l[i]; game.hotbar[i] = e && !isTesouro(e[0]) ? (e[1] >= MC_BASE ? e[1] : e[0]) : 0; }
+    if (on) {
+      for (let i = 0; i < 9; i++) {
+        const item = bag.l[i];
+        const obj = item && isObj(item[0], item[1]) ? item[1] : 0;
+        game.hotbarObj[i] = obj;
+        game.hotbar[i] = !item || obj || isTesouro(item[0]) ? 0 : (item[1] >= MC_BASE ? item[1] : item[0]);
+      }
+    } else if (game.hotbarObj.some(Boolean)) game.hotbarObj.fill(0);
     const slots = ui.el.hotbar.children;
     for (let i = 0; i < slots.length && i < 9; i++) {
       // tesouro na barra (arma lendária, gema…): não é bloco, não se põe; o desenho vem do ícone do item
@@ -262,6 +278,10 @@ export function initItems({ game, world, player, net, ui, input, scene, store, l
       if (!c) { c = h('b', { class: 'conta' }); slots[i].prepend(c); }   // antes: ui.js desenha o ícone no último filho (o canvas)
       const want = on && bag.l[i] && bag.l[i][2] > 1 ? String(bag.l[i][2]) : '';
       if (c.textContent !== want) c.textContent = want;
+      // objeto na barra: o ui.js vê o espaço como vazio; o ícone e o nome entram por cima (todo quadro: são 9 no máximo)
+      const o = game.hotbarObj[i];
+      if (o && cv && cv.getContext) { const ctx = cv.getContext('2d'); ctx.clearRect(0, 0, 64, 64); ctx.drawImage(objIcones.icone(o, 64), 0, 0); const nome = itemName(0, o); if (slots[i].title !== nome) { slots[i].title = nome; slots[i].setAttribute('aria-label', nome); } slots[i]._obj = o; }
+      else if (slots[i]._obj) { slots[i]._obj = 0; if (!t) slots[i]._item = undefined; }   // saiu o objeto: o ui.js redesenha o espaço
     }
   }
   game.hooks.frame.push((dt) => {
@@ -325,8 +345,9 @@ export function initItems({ game, world, player, net, ui, input, scene, store, l
   ui.el.hud.append(feedEl);
   const feed = new Map();     // chave do item -> linha
   function icon(cv, b, s, size) {
-    if (!game.icons) return;
     const ctx = cv.getContext('2d');
+    if (isObj(b, s)) { ctx.clearRect(0, 0, size, size); ctx.drawImage(objIcones.icone(s, size), 0, 0, size, size); return; }
+    if (!game.icons) return;
     ctx.clearRect(0, 0, size, size);
     if (isTesouro(b)) ctx.drawImage(game.icons.icon(aparenciaDe(b), size), 0, 0, size, size);   // provisório (Astra)
     else if (s >= MC_BASE && game.mcPaleta) ctx.drawImage(game.mcPaleta.icone(s, size), 0, 0, size, size);

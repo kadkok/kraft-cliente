@@ -13,12 +13,15 @@ import { createParts } from './parts.js';
 import { createPeles } from './pele.js';
 import { peleDe } from '../../shared/barcos-pele.js';
 import { raycastVoxels } from '../world/raycast.js';
+import { initSuperBomba } from '../game/super-bomba.js';
+import { RAIO as RAIO_SUPER } from '../../shared/super-bomba.js';
 
 const MAX_BLOCKS = 1500;
 const NB = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
 
 export function initMachines(ctx) {
   const { game, world, player, net, ui, input, scene, interaction, effects, store } = ctx;
+  const superBomba = initSuperBomba({ game, player, world, net, ui, salvarSolo: ctx.salvarCrateraSolo, blast });
   const parts = createParts(() => game.icons);
   const peles = createPeles();     // modelo .glb no lugar dos cubos, para a máquina com assinatura registrada (shared/barcos-pele.js)
   const list = new Map();          // id -> máquina
@@ -213,14 +216,16 @@ export function initMachines(ctx) {
     if (!net.offline) net.send({ t: 'sh', p: p.map((x) => +x.toFixed(2)), v: v.map((x) => +x.toFixed(2)) });
   }
   function flash(x, y, z, r) {
-    const mesh = new THREE.Mesh(flashGeo, new THREE.MeshBasicMaterial({ color: 0xffd9a0, transparent: true, opacity: 0.9, depthWrite: false, fog: false }));
+    const grande = r === RAIO_SUPER;
+    const mesh = new THREE.Mesh(flashGeo, new THREE.MeshBasicMaterial({ color: grande ? 0xffad68 : 0xffd9a0, transparent: true, opacity: grande ? 0.48 : 0.9, depthWrite: false, fog: false }));
     mesh.position.set(x, y, z); mesh.scale.setScalar(0.3);
     scene.add(mesh);
-    flashes.push({ mesh, t: 0, r });
+    flashes.push({ mesh, t: 0, r, grande });
   }
   // efeitos e empurrão de uma explosão (em todos os clientes)
   function blast(x, y, z, r) {
     flash(x, y, z, r);
+    if (r === RAIO_SUPER) r /= 2.5; // a onda alcança a borda da cratera
     if (game.audio) game.audio.play('boom', Math.min(1.4, 0.6 + r * 0.15), 0.7 + Math.random() * 0.15, 'stone', [x, y, z]);
     const dx = player.pos[0] - x, dy = player.pos[1] + 0.9 - y, dz = player.pos[2] - z, d = Math.hypot(dx, dy, dz);
     game.shake = Math.max(game.shake || 0, Math.max(0, 1 - d / (r * 6)) * 0.5);
@@ -398,9 +403,9 @@ export function initMachines(ctx) {
     }
     for (let i = flashes.length - 1; i >= 0; i--) {
       const f = flashes[i];
-      f.t += dt * 3.2;
-      f.mesh.scale.setScalar(0.3 + f.r * 1.5 * Math.min(1, f.t));
-      f.mesh.material.opacity = Math.max(0, 0.9 * (1 - f.t));
+      f.t += dt * (f.grande ? 0.8 : 3.2);
+      f.mesh.scale.setScalar(0.3 + f.r * (f.grande ? 1 : 1.5) * Math.min(1, f.t));
+      f.mesh.material.opacity = Math.max(0, (f.grande ? 0.48 : 0.9) * (1 - f.t));
       if (f.t >= 1) { scene.remove(f.mesh); f.mesh.material.dispose(); flashes[i] = flashes[flashes.length - 1]; flashes.pop(); }
     }
     if (game.shake > 0) game.shake = Math.max(0, game.shake - dt * 1.4);
@@ -434,6 +439,10 @@ export function initMachines(ctx) {
     const t = interaction.target;
     if (!t.hit||t.t>(game.treeAim?.t??Infinity)) return false;
     const fn = FUNC[t.id];
+    if (t.id === B.SUPER_BOMBA) {
+      if (playing && input.wasPressed('interact')) { superBomba.acender([t.x, t.y, t.z]); return true; }
+      return false;
+    }
     if (fn === F_SEAT) ui.setHint('Assento do piloto — F monta a máquina e senta');
     else if (fn === F_CANNON) ui.setHint('Canhão — F dispara');
     else if (fn === F_DYNAMITE) ui.setHint('Dinamite — F acende o pavio');
@@ -472,5 +481,5 @@ export function initMachines(ctx) {
     return true;
   });
 
-  return { list, assemble, sit, standUp, park, flip, explode, fire, ignite, seatAt: machineSeatAt, get seat() { return seat; }, parts, peles };
+  return { list, assemble, sit, standUp, park, flip, explode, fire, ignite, superBomba, seatAt: machineSeatAt, get seat() { return seat; }, parts, peles };
 }

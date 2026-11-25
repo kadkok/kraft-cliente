@@ -1,4 +1,6 @@
 import * as THREE from '../three.js';
+import { vestirExplorador } from './traje-explorador.js';
+import { vestirCriador } from './criador-pecas.js';
 import {SKIN_UNIT,skinParts,skinRects,skinPivots} from './skin-layout.js';
 
 const geometries=new Map(),textures=new Map();
@@ -53,8 +55,9 @@ export function buildMinecraftBody(options={}) {
   const material=new THREE.MeshStandardMaterial({map:skinTexture(false),roughness:.92,alphaTest:.5});
   const mesh=new THREE.SkinnedMesh(minecraftGeometry(false,options.handOnly),material);mesh.name='skin-compativel';mesh.castShadow=mesh.receiveShadow=true;
   mesh.boundingSphere=new THREE.Sphere(new THREE.Vector3(0,.9,0),1.4);root.add(mesh);mesh.bind(skeleton,new THREE.Matrix4());
-  let owned=null,dead=false;
+  let owned=null, mask=null, dead=false;
   function setSkin(canvas,slim=false,character='explorador') {
+    if (dead) return;
     owned?.dispose();owned=null;
     if(canvas){owned=new THREE.CanvasTexture(canvas);owned.colorSpace=THREE.SRGBColorSpace;owned.magFilter=canvas.width>64?THREE.LinearFilter:THREE.NearestFilter;owned.minFilter=THREE.LinearMipmapLinearFilter;owned.anisotropy=4;}
     material.map=owned||skinTexture(slim,character);material.needsUpdate=true;mesh.geometry=minecraftGeometry(slim,options.handOnly);
@@ -62,8 +65,53 @@ export function buildMinecraftBody(options={}) {
     for(let i=6;i<10;i++){const p=pivots[i-4];skeleton.boneInverses[i].makeTranslation(-p[0],-p[1]+6*SKIN_UNIT,-p[2]);}
     root.userData.avatar.variant=slim?'slim':'classic';
   }
-  function dispose(){if(dead)return;dead=true;owned?.dispose();skeleton.dispose();material.dispose();}
-  const body={root,mats:{skin:material},colors:{skin:material.color.clone()},torso:mesh,head:bones[1],armL:bones[2],armR:bones[3],legL:bones[4],legR:bones[5],elbowL:bones[6],elbowR:bones[7],kneeL:bones[8],kneeR:bones[9],skeleton,setSkin,dispose};
+  function setEfeitosSkin(gm) {
+    if (dead) return;
+    mask?.dispose();
+    mask = null;
+    body.efeitosSkin = gm;
+    const part = skinParts().find((p) => p.name === gm?.regiao);
+    if (part && gm.reflexo) {
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+      const dry = Math.round(255 * (1 - .82 * gm.reflexo));
+      ctx.fillStyle = '#00ff00';
+      ctx.fillRect(0, 0, 64, 64);
+      ctx.fillStyle = `rgb(255,${dry},255)`;
+      for (const layer of [part.base, part.outer]) {
+        for (const rect of skinRects(part.size, layer)) ctx.fillRect(...rect);
+      }
+      mask = new THREE.CanvasTexture(canvas);
+      mask.magFilter = THREE.NearestFilter;
+    }
+    // O reflexo usa a rugosidade por região. A emissão usa a mesma máscara
+    // com preto fora da região em um atlas separado.
+    emissao?.dispose();
+    emissao = null;
+    if (part && gm.brilho) {
+      material.emissive.set(gm.cor);
+      const canvas = document.createElement('canvas');
+      canvas.width = canvas.height = 64;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, 64, 64);
+      ctx.fillStyle = '#fff';
+      for (const layer of [part.base, part.outer]) {
+        for (const rect of skinRects(part.size, layer)) ctx.fillRect(...rect);
+      }
+      emissao = new THREE.CanvasTexture(canvas);
+      emissao.magFilter = THREE.NearestFilter;
+    }
+    material.roughnessMap = mask;
+    material.emissiveMap = emissao;
+    material.emissiveIntensity = part ? gm.brilho * 2 : 0;
+    material.needsUpdate = true;
+  }
+
+  let emissao = null;
+  function dispose(){if(dead)return;dead=true;vestirExplorador(body, null);vestirCriador(body, null);owned?.dispose();mask?.dispose();emissao?.dispose();skeleton.dispose();material.dispose();}
+  const body={root,mats:{skin:material},colors:{skin:material.color.clone()},torso:mesh,head:bones[1],armL:bones[2],armR:bones[3],legL:bones[4],legR:bones[5],elbowL:bones[6],elbowR:bones[7],kneeL:bones[8],kneeR:bones[9],skeleton,setSkin,setEfeitosSkin,dispose};
   root.userData.avatar={style:'lavra-hd-skin-compatible',variant:'classic',height:1.8,texture:640,triangles:mesh.geometry.index.count/3,bones:10,draws:1,origin:'Skin original Lavra640; layout normalizado compatível'};
   Object.defineProperty(root.userData,'body',{value:body});root.userData.disposeAvatar=dispose;return body;
 }

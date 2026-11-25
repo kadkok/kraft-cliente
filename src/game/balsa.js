@@ -325,7 +325,8 @@ export function initBalsa({ game, scene, camera, net, player, ui, avatars }) {
       if (Math.abs(b.sent) < 0.92) B.root.rotation.y = -Math.PI / 2 * b.sent;
       const gira = andando > 0.05 ? Math.sin(tt * 0.7) * 0.5 : 0;
       b.roda.rotation.x = gira;
-      if (B.armL) { const acena = (st.fase === 0 || st.fase === 2) && st.falta < 22 ? Math.sin(tt * 7) * 0.5 : 0; B.armL.rotation.x = -1.15 + gira * 0.2; B.armR.rotation.x = acena ? -2.6 + acena : -1.15 - gira * 0.2; B.armR.rotation.z = acena ? 0.35 : 0; }
+      // braços à frente, no timão (rosto do boneco em −Z: girar o braço em +x leva a mão para a frente; com −x ia para trás)
+      if (B.armL) { const acena = (st.fase === 0 || st.fase === 2) && st.falta < 22 ? Math.sin(tt * 7) * 0.5 : 0; B.armL.rotation.x = 1.15 + gira * 0.2; B.armR.rotation.x = acena ? 2.6 - acena : 1.15 - gira * 0.2; B.armR.rotation.z = acena ? 0.35 : 0; }
       if (B.legL) { B.legL.rotation.x = 0; B.legR.rotation.x = 0; }
       // flâmula e esteira
       const pa = b.fl.geometry.attributes.position; for (let k = 0; k < pa.count; k++) pa.setZ(k, Math.sin(tt * 6 + pa.getX(k) * 5) * 0.07 * (0.5 - pa.getX(k)));

@@ -26,8 +26,8 @@ import {
   K_AIR, K_CUBE, K_CUTOUT, K_CROSS, K_LIQUID, K_MODEL,
 } from '../../shared/blocks.js';
 
-import { CUBE, surfaceShape, shapeHeight, SHAPES, miniShape, isMiniShape, isMcShape } from '../../shared/surfaces.js';
-import { isMiniState, miniMask, MINI_OK, DEFAULT_STAIR_STATE, isTroncoQuadrado, TRONCO_OK } from '../../shared/minis.js';
+import { CUBE, TERRAIN, surfaceShape, shapeHeight, SHAPES, miniShape, isMiniShape, isMcShape } from '../../shared/surfaces.js';
+import { isMiniState, miniMask, MINI_OK, DEFAULT_STAIR_STATE, isTroncoQuadrado, TRONCO_OK, isVisaoState, visaoBloco, visaoFace } from '../../shared/minis.js';
 import { MC_BASE, MC_LUZ } from '../../shared/mc-estados.js';
 import { mcMalha } from './mc-malha.js';
 import { E_PLANTA_3D, PASSO_PLANTA } from '../../shared/plantas.js';   // plantas com corpo 3D: lista em vez de planos em X
@@ -63,6 +63,7 @@ export function createMesher(gen) {
   const roundWood = new Uint8Array(RSIZE);
   const squareWood = new Uint8Array(RSIZE);
   const miniVox = new Uint8Array(RSIZE);
+  const visVox = new Uint16Array(RSIZE); let visLista = [];   // visão unilateral: estado por célula (limpo a cada malha)
   const regionIndex=(x,y,z)=>(CW+x)+(CW+z)*RW+(y-YB)*RA;
   const get=(x,y,z)=> y<Y_MIN?B.BEDROCK:y>=Y_TOP?B.AIR:rv[regionIndex(x,y,z)];
   get.shape=(x,y,z)=>y<Y_MIN||y>=Y_TOP?CUBE:shapes[regionIndex(x,y,z)];
@@ -74,11 +75,16 @@ export function createMesher(gen) {
   rv.fill(B.BEDROCK);              // abaixo do que se copia a cada malha: sólido e escuro (baixoSujo cuida do resto)
   sky.fill(15, RA * (CAMADAS + 1)); // acima do mundo: céu aberto
   let baixoSujo = RL;              // menor camada da região que alguma malha já escreveu (abaixo dela: enchimento)
+  let altoSujo = 0;                // maior camada da região que alguma malha já sujou em shapes/protectedVox/miniVox/wood
+  let minExtraY = Y_TOP, maxExtraY = Y_MIN - 1;
+  let minLeafY = Y_TOP, maxLeafY = Y_MIN - 1;
+  let minGrassY = Y_TOP, maxGrassY = Y_MIN - 1;
+  let minShapeY = Y_TOP, maxShapeY = Y_MIN - 1;
   const q = new Int32Array(QS);
   const skyTop = new Int16Array(RA);
   const CLEAR = new Uint8Array(256);
   for (let i = 0; i < 128; i++) {
-    CLEAR[i] = (KIND[i] === K_AIR || KIND[i] === K_CROSS || KIND[i] === K_MODEL || (IS_GLASS[i] && i !== B.GLASS_MIRROR) || i === B.MC_RECORTE) ? 1 : 0;
+    CLEAR[i] = (KIND[i] === K_AIR || KIND[i] === K_CROSS || KIND[i] === K_MODEL || (IS_GLASS[i] && i !== B.GLASS_MIRROR) || i === B.MC_RECORTE || i === B.VISAO) ? 1 : 0;
   }
   // blocos do Minecraft na região: estado e luz própria por célula (limpos pela lista a cada malha)
   const mcVox = new Uint16Array(RSIZE), mcLuz = new Uint8Array(RSIZE);
@@ -351,7 +357,11 @@ export function createMesher(gen) {
             const fullNb = OPAQUE[nb] && !roundWood[c + step] && (isMiniShape(nbShape) ? miniMask(miniVox[c + step]) === 15 : (nbShape === CUBE || aboveFullSlope));
             const solidNb = OPAQUE[nb] && !roundWood[c + step] && (!isMiniShape(nbShape) || miniMask(miniVox[c + step]) === 15);
             let bucket = 0, layer = 0, surf = 0;
-            if (kind === K_CUBE) {
+            if (b === B.VISAO) {   // visão unilateral: só a face de fora, com a textura do bloco escolhido (de dentro: nada)
+              const st = visVox[c];
+              if (fullNb || d !== (st ? visaoFace(st) : 4)) continue;
+              layer = TEX[(st ? visaoBloco(st) : B.GLASS) * 6 + d];
+            } else if (kind === K_CUBE) {
               if (fullNb) continue;
               layer = TEX[b * 6 + d];
             } else if (kind === K_CUTOUT) {
@@ -433,8 +443,10 @@ export function createMesher(gen) {
 
   // plantas em X e lista de peças com modelo próprio
   function extras(topC, bot) {
+    const y0 = Math.max(bot, minExtraY), y1 = Math.min(topC, maxExtraY);
+    if (y0 > y1) return;
     const bk = buckets[1];
-    for (let y = bot; y <= topC; y++) {
+    for (let y = y0; y <= y1; y++) {
       for (let z = 0; z < CW; z++) {
         const base = CW + (CW + z) * RW + (y - YB) * RA;
         for (let x = 0; x < CW; x++) {
@@ -510,13 +522,20 @@ export function createMesher(gen) {
     lawnN = 0;
     // copa: folhagem empilhada em cada coluna do pedaço (0 = céu aberto). Serve ao chão de folha seca e à relva rala.
     const yFim = Math.max(bot, FUNDO);
-    for (let z = 0; z < CW; z++) for (let x = 0; x < CW; x++) {
-      let n = 0;
-      for (let y = topC, c = CW + x + (CW + z) * RW + (topC - YB) * RA; y > yFim; y--, c -= RA) { const b = rv[c]; if (b === B.LEAVES || b === B.PINE_LEAVES) n++; }
-      canopy[x + z * CW] = n > 255 ? 255 : n;
+    const lTop = Math.min(topC, maxLeafY), lBot = Math.max(yFim + 1, minLeafY);
+    if (lTop < lBot) {
+      canopy.fill(0);
+    } else {
+      for (let z = 0; z < CW; z++) for (let x = 0; x < CW; x++) {
+        let n = 0;
+        for (let y = lTop, c = CW + x + (CW + z) * RW + (lTop - YB) * RA; y >= lBot; y--, c -= RA) { const b = rv[c]; if (b === B.LEAVES || b === B.PINE_LEAVES) n++; }
+        canopy[x + z * CW] = n > 255 ? 255 : n;
+      }
     }
     // relva só de y 0 para cima: a lista guarda o y em 16 bits sem sinal (shared/relva.js)
-    for (let y = Math.max(0, bot, FUNDO + 1); y <= topC; y++) {
+    const g0 = Math.max(0, bot, FUNDO + 1, minGrassY - 1), g1 = Math.min(topC, maxGrassY);
+    if (g0 > g1) return;
+    for (let y = g0; y <= g1; y++) {
       for (let z = 0; z < CW; z++) {
         const base = CW + (CW + z) * RW + (y - YB) * RA;
         for (let x = 0; x < CW; x++) {
@@ -566,7 +585,7 @@ export function createMesher(gen) {
     let menor = FUNDO;
     if (minYs) { menor = Y_TOP; for (let i = 0; i < 9; i++) { const v = minYs[i]; menor = Number.isFinite(v) ? Math.min(menor, v) : FUNDO; } }
     const bot = Math.max(FUNDO, Math.min(menor - 1, topC));
-    const c0 = Math.max(Y_MIN, bot - 1), L0 = c0 - YB;
+    const c0 = Math.max(Y_MIN, bot - 1), L0 = c0 - YB, LTop = Math.min(RL, top - YB + 3);
     const emitters = [];
 
     if (L0 > baixoSujo) {            // a malha anterior desceu mais: o que ela deixou abaixo de c0 volta a ser enchimento
@@ -574,12 +593,18 @@ export function createMesher(gen) {
       for (const a of [protectedVox, miniVox, squareWood, roundWood]) a.fill(0, baixoSujo * RA, L0 * RA);
       shapes.fill(CUBE, baixoSujo * RA, L0 * RA);
     }
-    baixoSujo = L0;
-    shapes.fill(CUBE, L0 * RA); protectedVox.fill(0, L0 * RA); miniVox.fill(0, L0 * RA); squareWood.fill(0, L0 * RA);
+    const fillEnd = Math.max(LTop, altoSujo) * RA;
+    baixoSujo = L0; altoSujo = LTop;
+    shapes.fill(CUBE, L0 * RA, fillEnd); protectedVox.fill(0, L0 * RA, fillEnd); miniVox.fill(0, L0 * RA, fillEnd); squareWood.fill(0, L0 * RA, fillEnd); roundWood.fill(0, L0 * RA, fillEnd);
+    minExtraY = Y_TOP; maxExtraY = Y_MIN - 1;
+    minLeafY = Y_TOP; maxLeafY = Y_MIN - 1;
+    minGrassY = Y_TOP; maxGrassY = Y_MIN - 1;
+    minShapeY = Y_TOP; maxShapeY = Y_MIN - 1;
 
     for (let ci = 0; ci < 9; ci++) {
       const src = chunks[ci];
       const ox = (ci % 3) * CW, oz = ((ci / 3) | 0) * CW;
+      const isCenter = ci === 4;
       for (let y = c0; y <= top; y++) {
         const sy = (y - Y_MIN) << 8, dy = (y - YB) * RA + ox;
         for (let z = 0; z < CW; z++) {
@@ -587,10 +612,17 @@ export function createMesher(gen) {
           for (let x = 0; x < CW; x++, si++, di++) {
             const b = src[si];
             rv[di] = b;
+            if (b === 0) continue;
             if (EMIT[b]) emitters.push(di);
             if (IS_STAIR[b]) {
               miniVox[di] = DEFAULT_STAIR_STATE;
               protectedVox[di] = 1;
+            }
+            if (isCenter) {
+              const k = KIND[b];
+              if (k === K_CROSS || k === K_MODEL) { if (y < minExtraY) minExtraY = y; if (y > maxExtraY) maxExtraY = y; }
+              if (b === B.LEAVES || b === B.PINE_LEAVES) { if (y < minLeafY) minLeafY = y; if (y > maxLeafY) maxLeafY = y; }
+              else if (b === B.GRASS) { if (y < minGrassY) minGrassY = y; if (y > maxGrassY) maxGrassY = y; }
             }
           }
         }
@@ -608,6 +640,7 @@ export function createMesher(gen) {
       for(let ci=0;ci<9;ci++)for(const entry of miniCells[ci]||[]){
         const index=entry&0xffff,state=entry>>>16;   // 16 bits: estado de mini, terra moldada (64) ou bloco MC (≥ 256)
         const yMundo=(index>>8)+Y_MIN;if(yMundo<c0)continue;
+        if(isVisaoState(state)){const ri=(ci%3)*CW+(index&15)+(Math.floor(ci/3)*CW+((index>>4)&15))*RW+(yMundo-YB)*RA;if(rv[ri]===B.VISAO){visVox[ri]=state;visLista.push(ri);}continue;}
         if(state>=MC_BASE){                       // bloco do Minecraft: estado guardado para a malha própria e a luz
           const x=(ci%3)*CW+(index&15),z=Math.floor(ci/3)*CW+((index>>4)&15),y=yMundo,ri=x+z*RW+(y-YB)*RA;
           if(rv[ri]<B.MC_SOLIDO||rv[ri]>B.MC_FORMA)continue;
@@ -631,13 +664,25 @@ export function createMesher(gen) {
     // raiz arredondada (trees.js para árvores naturais; foliage.js para troncos
     // colocados/editados), não cobrindo a face inteira dos blocos vizinhos.
     // O cacto vira cápsula no mesmo passo, sem entrar em isTreeWood (não cai nem corta como madeira).
-    roundWood.fill(0, L0 * RA);
     const yForma = Math.max(FUNDO + 1, bot);   // a rocha-mãe do fundo é sempre cubo
     for(let y=yForma;y<=top;y++)for(let z=-1;z<=CW;z++)for(let x=-1;x<=CW;x++){
-      const c=regionIndex(x,y,z);
+      const c=regionIndex(x,y,z), b=rv[c];
+      if(b===0)continue;
+      if(!miniVox[c]&&!mcVox[c]){
+        if((isTreeWood(b)&&!squareWood[c])||b===B.CACTUS){roundWood[c]=1;continue;}
+        if(!TERRAIN[b]&&!IS_STAIR[b])continue;
+        if(protectedVox[c])continue;
+        const up=rv[c+RA];
+        if(up>0&&SOLID[up]===1&&(!TERRAIN[up]||protectedVox[c+RA]||(y+2<Y_TOP&&SOLID[rv[c+RA+RA]]===1)))continue;
+      }
       const shape=surfaceShape(get,edited,x,y,z);
-      shapes[c]=shape;
-      if(shape===CUBE&&((isTreeWood(rv[c])&&!squareWood[c])||rv[c]===B.CACTUS))roundWood[c]=1;
+      if(shape!==CUBE){
+        shapes[c]=shape;
+        if(y<minShapeY)minShapeY=y;
+        if(y>maxShapeY)maxShapeY=y;
+      }else if((isTreeWood(b)&&!squareWood[c])||b===B.CACTUS){
+        roundWood[c]=1;
+      }
     }
     light(top, emitters, c0);
     gen.climateGrid(cx * CW, cz * CW, 17, tGrid, mGrid);
@@ -648,74 +693,77 @@ export function createMesher(gen) {
     extras(topC, bot);
     relva(topC, bot);
     const slope=buckets[3],cutout=buckets[1],surfaceShapes=[];
-    // Suavização das normais nos vértices compartilhados da encosta, inclusive na borda do chunk.
-    const slopeAcc=new Map();
-    const slopeKey=(vx,vy,vz)=>Math.round(vx*64)+','+Math.round(vy*64)+','+Math.round(vz*64);
-    for(let y=yForma;y<=top;y++)for(let z=-1;z<=CW;z++)for(let x=-1;x<=CW;x++){
-      const shape=shapes[regionIndex(x,y,z)];
-      if(shape===CUBE||isMiniShape(shape)||isMcShape(shape))continue;
-      for(const face of SHAPES[shape].faces){
-        if(face.face!==2||face.cap)continue;
-        for(let i=0;i<3;i++){
-          const k=slopeKey(x+face.v[i][0],y+face.v[i][1],z+face.v[i][2]);
-          let a=slopeAcc.get(k);if(!a)slopeAcc.set(k,a=[0,0,0]);
-          a[0]+=face.n[0];a[1]+=face.n[1];a[2]+=face.n[2];
-        }
-      }
-    }
-    for(const a of slopeAcc.values()){const l=Math.hypot(a[0],a[1],a[2])||1;a[0]/=l;a[1]/=l;a[2]/=l;}
-    for(let y=yForma;y<=topC;y++)for(let z=0;z<CW;z++)for(let x=0;x<CW;x++){
-      const c=regionIndex(x,y,z),shape=shapes[c];if(shape===CUBE||isMcShape(shape))continue;   // MC: world/mc-malha.js
-      if(isMiniShape(shape)){
-        const b=rv[c],isCut=KIND[b]===K_CUTOUT,bk=isCut?cutout:slope;
-        for(const q of SHAPES[shape].quads){
-          const d=q.face,nbIdx=c+STEP[d],nb=rv[nbIdx];
-          if(q.outer){
-            const solidNb=OPAQUE[nb]&&!roundWood[nbIdx]&&(!isMiniShape(shapes[nbIdx])||miniMask(miniVox[nbIdx])===15);
-            if(isCut?(solidNb||(nb===b&&(!miniVox[nbIdx]||miniMask(miniVox[nbIdx])===15))):solidNb)continue;
-          }
-          let lt,ao;
-          if(q.outer){
-            corners(c,d);
-            lt=Math.max(...cSK)|(Math.max(...cBL)<<4);
-            ao=Math.round((cAO[0]+cAO[1]+cAO[2]+cAO[3])/4);
-          }else{
-            lt=sky[c]|((hasBlk?blk[c]:0)<<4);
-            ao=3;
-          }
-          const layer=TEX[b*6+d];
-          ensure(bk,4);
-          for(const v of q.v){
-            vert(bk,x+v[0],y+v[1],z+v[2],layer,d|(ao<<3),lt);
-            if(!isCut)slopeNormals.push(...q.n);
+    if(minShapeY<=maxShapeY){
+      // Suavização das normais nos vértices compartilhados da encosta, inclusive na borda do chunk.
+      const slopeAcc=new Map();
+      const slopeKey=(vx,vy,vz)=>Math.round(vx*64)+','+Math.round(vy*64)+','+Math.round(vz*64);
+      for(let y=minShapeY;y<=maxShapeY;y++)for(let z=-1;z<=CW;z++)for(let x=-1;x<=CW;x++){
+        const shape=shapes[regionIndex(x,y,z)];
+        if(shape===CUBE||isMiniShape(shape)||isMcShape(shape))continue;
+        for(const face of SHAPES[shape].faces){
+          if(face.face!==2||face.cap)continue;
+          for(let i=0;i<3;i++){
+            const k=slopeKey(x+face.v[i][0],y+face.v[i][1],z+face.v[i][2]);
+            let a=slopeAcc.get(k);if(!a)slopeAcc.set(k,a=[0,0,0]);
+            a[0]+=face.n[0];a[1]+=face.n[1];a[2]+=face.n[2];
           }
         }
-        continue;
       }
-      surfaceShapes.push(x+(z<<4)+((y-Y_MIN)<<8),shape);   // índice de ARMAZENAMENTO (cabe em 16 bits): world.js desfaz
-      const water=shoreWater(get,x,y,z,shape);
-      if(water&&!water.covered&&!(OCEANO&&y<=SEA+1)){   // margem no nível do mar: é do render/oceano.js
-        corners(c,2);const lt=Math.max(...cSK)|(Math.max(...cBL)<<4),bk=buckets[2];
-        for(const tri of shoreTriangles(water)){
-          ensure(bk,4);
-          for(const v of [tri[0],tri[1],tri[2],tri[2]])vert(bk,x+v[0],y+v[1],z+v[2],Math.min(WDEEP,Math.max(0,v[3])),2|24,lt,255);
+      for(const a of slopeAcc.values()){const l=Math.hypot(a[0],a[1],a[2])||1;a[0]/=l;a[1]/=l;a[2]/=l;}
+      const yS1 = Math.min(topC, maxShapeY);
+      for(let y=minShapeY;y<=yS1;y++)for(let z=0;z<CW;z++)for(let x=0;x<CW;x++){
+        const c=regionIndex(x,y,z),shape=shapes[c];if(shape===CUBE||isMcShape(shape))continue;   // MC: world/mc-malha.js
+        if(isMiniShape(shape)){
+          const b=rv[c],isCut=KIND[b]===K_CUTOUT,bk=isCut?cutout:slope;
+          for(const q of SHAPES[shape].quads){
+            const d=q.face,nbIdx=c+STEP[d],nb=rv[nbIdx];
+            if(q.outer){
+              const solidNb=OPAQUE[nb]&&!roundWood[nbIdx]&&(!isMiniShape(shapes[nbIdx])||miniMask(miniVox[nbIdx])===15);
+              if(isCut?(solidNb||(nb===b&&(!miniVox[nbIdx]||miniMask(miniVox[nbIdx])===15))):solidNb)continue;
+            }
+            let lt,ao;
+            if(q.outer){
+              corners(c,d);
+              lt=Math.max(...cSK)|(Math.max(...cBL)<<4);
+              ao=Math.round((cAO[0]+cAO[1]+cAO[2]+cAO[3])/4);
+            }else{
+              lt=sky[c]|((hasBlk?blk[c]:0)<<4);
+              ao=3;
+            }
+            const layer=TEX[b*6+d];
+            ensure(bk,4);
+            for(const v of q.v){
+              vert(bk,x+v[0],y+v[1],z+v[2],layer,d|(ao<<3),lt);
+              if(!isCut)slopeNormals.push(...q.n);
+            }
+          }
+          continue;
         }
-      }
-      for(const face of SHAPES[shape].faces){
-        if(face.cap)continue;
-        const d=face.face,nb=rv[c+STEP[d]];
-        if(d!==2 && OPAQUE[nb] && !roundWood[c+STEP[d]])continue;
-        const topCell = d === 2 && shapes[c + RA] !== CUBE && !isMiniShape(shapes[c + RA]) && !isMcShape(shapes[c + RA]) ? c + RA : c;
-        corners(topCell, d);
-        // Uma rampa diagonal cruza duas camadas, mas a cobertura continua
-        // sendo a da superfície da coluna (grama/neve/areia etc.).
-        const material=d===2&&shapes[c+RA]!==CUBE&&!isMcShape(shapes[c+RA])?rv[c+RA]:rv[c];
-        const sk=Math.max(...cSK),bl=Math.max(...cBL),lt=sk|(bl<<4),layer=TEX[material*6+d];
-        ensure(slope,4);
-        for(const v of [face.v[0],face.v[1],face.v[2],face.v[2]]){
-          vert(slope,x+v[0],y+v[1],z+v[2],layer,d|24,lt);
-          const smooth=d===2?slopeAcc.get(slopeKey(x+v[0],y+v[1],z+v[2])):null;
-          slopeNormals.push(...(smooth||face.n));
+        surfaceShapes.push(x+(z<<4)+((y-Y_MIN)<<8),shape);   // índice de ARMAZENAMENTO (cabe em 16 bits): world.js desfaz
+        const water=shoreWater(get,x,y,z,shape);
+        if(water&&!water.covered&&!(OCEANO&&y<=SEA+1)){   // margem no nível do mar: é do render/oceano.js
+          corners(c,2);const lt=Math.max(...cSK)|(Math.max(...cBL)<<4),bk=buckets[2];
+          for(const tri of shoreTriangles(water)){
+            ensure(bk,4);
+            for(const v of [tri[0],tri[1],tri[2],tri[2]])vert(bk,x+v[0],y+v[1],z+v[2],Math.min(WDEEP,Math.max(0,v[3])),2|24,lt,255);
+          }
+        }
+        for(const face of SHAPES[shape].faces){
+          if(face.cap)continue;
+          const d=face.face,nb=rv[c+STEP[d]];
+          if(d!==2 && OPAQUE[nb] && !roundWood[c+STEP[d]])continue;
+          const topCell = d === 2 && shapes[c + RA] !== CUBE && !isMiniShape(shapes[c + RA]) && !isMcShape(shapes[c + RA]) ? c + RA : c;
+          corners(topCell, d);
+          // Uma rampa diagonal cruza duas camadas, mas a cobertura continua
+          // sendo a da superfície da coluna (grama/neve/areia etc.).
+          const material=d===2&&shapes[c+RA]!==CUBE&&!isMcShape(shapes[c+RA])?rv[c+RA]:rv[c];
+          const sk=Math.max(...cSK),bl=Math.max(...cBL),lt=sk|(bl<<4),layer=TEX[material*6+d];
+          ensure(slope,4);
+          for(const v of [face.v[0],face.v[1],face.v[2],face.v[2]]){
+            vert(slope,x+v[0],y+v[1],z+v[2],layer,d|24,lt);
+            const smooth=d===2?slopeAcc.get(slopeKey(x+v[0],y+v[1],z+v[2])):null;
+            slopeNormals.push(...(smooth||face.n));
+          }
         }
       }
     }
@@ -741,6 +789,8 @@ export function createMesher(gen) {
       clima: (x, z, y) => { const gi = x + z * 17; let t = tGrid[gi] - gen.lapse(y); t = t < 0 ? 0 : t > 1 ? 1 : t; return [(t * 255) | 0, (mGrid[gi] * 255) | 0]; } }));
     for (const ri of mcLista) { mcVox[ri] = 0; mcLuz[ri] = 0; }
     mcLista = [];
+    for (const ri of visLista) visVox[ri] = 0;
+    visLista = [];
     if(out.parts[3])out.parts[3].normal=new Float32Array(slopeNormals);
     // parte 5: opaco com vértice abaixo de y 0 (mesmo material da parte 0; posição Int16, y do mundo)
     out.parts.push(fundoBk.n ? { pos: fundoBk.pos.slice(0, fundoBk.n * 4), dat: fundoBk.dat.slice(0, fundoBk.n * 4), n: fundoBk.n } : null);

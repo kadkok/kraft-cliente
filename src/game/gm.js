@@ -1,6 +1,10 @@
 // Ferramentas do modo GM. O servidor confere a autorização de cada operação.
 import { h } from '../ui/ui.js';
 import { ARVORES } from '../../shared/gm.js';
+import { initStargate } from './stargate.js';
+import { initPortas } from './portas.js';
+import { initElevador } from './elevador.js';
+import { initMitico } from './mitico.js';   // GM quebra a rocha-mãe mais funda: mundo mítico (23/11)   // elevador de verdade (23/11): cabine, seletor de andares   // portas de qualquer bloco (23/11): clicar abre/fecha   // portal secreto da ilhota do Karlion (23/11): lista de ilhas ao cruzar o anel
 
 const CSS = `
 .gm-acesso[hidden], .gm-tela[hidden] { display: none !important; }
@@ -22,6 +26,10 @@ const CSS = `
 
 export function initGm({ game, net, ui, mapa, openOverlay, closeOverlay, pausar, touch }) {
   document.head.append(h('style', { text: CSS }));
+  initStargate({ game, net, ui, openOverlay, closeOverlay });
+  initPortas({ game, net });
+  initElevador({ game, net, openOverlay, closeOverlay });
+  initMitico({ game, net });
   let pin = null,
     outro = null,
     origem = false;

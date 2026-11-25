@@ -3,6 +3,7 @@
 // estados que chegam da rede.
 
 import * as THREE from '../three.js';
+import { aplicarSkin, limparSkin } from './estudio-skins.js';
 import { buildMinecraftBody } from './minecraft-avatar.js';
 
 export function buildBody(colorHex = '#e8873a') {
@@ -85,7 +86,7 @@ export function buildPrimitiveBody(colorHex) {
   return { root, mats, colors, torso, head, armL, armR, legL, legR };
 }
 
-export function createAvatars(scene, lightProbe) {
+export function createAvatars(scene, lightProbe, mundo = () => '') {
   const list = new Map();
   const group = new THREE.Group();
   group.name = 'jogadores';
@@ -100,6 +101,7 @@ export function createAvatars(scene, lightProbe) {
     group.add(body.root);
     const a = { id: p.id, name: p.name, color: p.color, body, tag, snaps: [], phase: 0, speed: 0, shade: 1, last: [0, 0, 0], pos: [0, 0, 0], held: 0, flags: 0 };
     list.set(p.id, a);
+    if (p.skin) aplicarSkin(body, p.skin, (id) => `f/${encodeURIComponent(mundo())}/${id}`).catch(() => {});
     if (p.p) push(p.id, p.p[0], p.p[1], p.p[2], p.r ? p.r[0] : 0, p.r ? p.r[1] : 0, p.h || 0, p.f || 0);
     return a;
   }
@@ -107,6 +109,7 @@ export function createAvatars(scene, lightProbe) {
     const a = list.get(id);
     if (!a) return;
     group.remove(a.body.root);
+    limparSkin(a.body);
     if (a.body.dispose) a.body.dispose();
     else for (const k in a.body.mats) a.body.mats[k].dispose();
     a.tag.material.map.dispose(); a.tag.material.dispose();
@@ -142,6 +145,9 @@ export function createAvatars(scene, lightProbe) {
       body.root.position.set(x, y, z);
       body.root.rotation.y = yaw; // o rosto da skin fica em −Z, que é a frente de quem joga (17/11: o + π deixava todo mundo de costas)
       body.head.rotation.x = -pitch;
+      // nome acima da cabeça: acompanha as proporções e o chapéu do criador de personagem
+      const alto = body.head.parent?.scale.y || 1;
+      a.tag.position.y = 2.18 * alto + (body.pecasCriador?.extraTopo || 0) * alto;
       const moved = Math.hypot(x - a.last[0], z - a.last[2]);
       a.last[0] = x; a.last[1] = y; a.last[2] = z;
       a.pos[0] = x; a.pos[1] = y; a.pos[2] = z;

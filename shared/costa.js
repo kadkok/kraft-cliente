@@ -337,6 +337,10 @@ export function resolverObstaculoBarcoLocalFallback(posLocal, velLocal, raio = 0
 // ---- amostragem de ondas unificada (shared/mar.js + shared/ondas.js) ---------------------------------------------
 
 export function nivelAguaEmCosta(x, z, t = 0, ambiente = {}) {
+  return nivelDaAmostra(x, z, t, ambiente, null);
+}
+
+function nivelDaAmostra(x, z, t, ambiente, relevo) {
   if (!Number.isFinite(x) || !Number.isFinite(z)) return MAR_NIVEL;
   if (ambiente && typeof ambiente.aguaEm === 'function') {
     const h = ambiente.aguaEm(x, z, t);
@@ -348,11 +352,14 @@ export function nivelAguaEmCosta(x, z, t = 0, ambiente = {}) {
     const est = Number.isFinite(mar.estado) ? mar.estado : 0.3;
     const per = multMar(est).periodo || 9.5;
     const fase = (mar.fase || 0) + dtMar / per;
-    const h = MAR_NIVEL + alturaMar(x, z, (mar.tempo || 0) + dtMar, mar.prof(x, z), mar.s(x, z), mar.dir, est, fase);
+    const prof = relevo?.profMar ?? mar.prof(x, z);
+    const costa = relevo?.costaMar ?? mar.s(x, z);
+    if (relevo) { relevo.profMar = prof; relevo.costaMar = costa; }
+    const h = MAR_NIVEL + alturaMar(x, z, (mar.tempo || 0) + dtMar, prof, costa, mar.dir, est, fase);
     if (Number.isFinite(h)) return h;
   }
   const gen = ambiente?.gen;
-  let prof = ambiente?.profundidade;
+  let prof = relevo?.profGen ?? ambiente?.profundidade;
   if (!Number.isFinite(prof)) {
     if (gen && typeof gen.height === 'function') {
       prof = Math.max(0, MAR_NIVEL - (gen.height(Math.round(x), Math.round(z)) + 1));
@@ -362,12 +369,15 @@ export function nivelAguaEmCosta(x, z, t = 0, ambiente = {}) {
       prof = 8;
     }
   }
+  if (relevo) relevo.profGen = prof;
   if (gen && gen.arq && typeof gen.arq.s === 'function') {
     const tempo = ambiente?.tempo;
     const E = Number.isFinite(ambiente?.E) ? ambiente.E : estadoDoTempo(tempo);
     const vDir = ambiente?.ventoDir || ventoMar(tempo);
     const fase = Number.isFinite(ambiente?.fase) ? ambiente.fase : t / (multMar(E).periodo || 9.5);
-    const h = MAR_NIVEL + alturaMar(x, z, t, prof, gen.arq.s(x, z), vDir, E, fase);
+    const costa = relevo?.costaGen ?? gen.arq.s(x, z);
+    if (relevo) relevo.costaGen = costa;
+    const h = MAR_NIVEL + alturaMar(x, z, t, prof, costa, vDir, E, fase);
     if (Number.isFinite(h)) return h;
   }
   const dh = alturaOnda(x, z, t, ambiente?.vento || PADRAO_VENTO, prof);
@@ -515,6 +525,8 @@ function subPassoBarco(b, h, driven, tAgua, ambiente, amostras, pitchStiffness) 
   let wetArea = 0, totalArea = 0, immersion = 0;
   let aguaMedia = 0, propAgua = 0, propDist = Infinity;
   const dtV = 0.05;
+  // Altura e velocidade vertical vêm do mesmo ponto em dois instantes. Só o relevo é comum.
+  const relevo = {};
   const propLoc = DIMENSOES_BARCO_TIDEWATER.helicePos;
   rotacionarVecPorQuat(propLoc[0], propLoc[1], propLoc[2], q, _prop);
   _prop[0] += b.pos[0]; _prop[1] += b.pos[1]; _prop[2] += b.pos[2];
@@ -526,9 +538,8 @@ function subPassoBarco(b, h, driven, tAgua, ambiente, amostras, pitchStiffness) 
     _pw[1] += b.pos[1];
     _pw[2] += b.pos[2];
 
-    const hw = nivelAguaEmCosta(_pw[0], _pw[2], tAgua, ambiente);
-    const hwAnt = nivelAguaEmCosta(_pw[0], _pw[2], tAgua - dtV, ambiente);
-    const waterV = clamp((hw - hwAnt) / dtV, -3, 3);
+    relevo.profMar = relevo.costaMar = relevo.profGen = relevo.costaGen = undefined;
+    const hw = nivelDaAmostra(_pw[0], _pw[2], tAgua, ambiente, relevo);
     aguaMedia += hw;
 
     const dProp = (_pw[0] - _prop[0]) ** 2 + (_pw[2] - _prop[2]) ** 2;
@@ -538,6 +549,8 @@ function subPassoBarco(b, h, driven, tAgua, ambiente, amostras, pitchStiffness) 
     const depth = hw - _pw[1];
     if (depth <= 0) continue;
 
+    const hwAnt = nivelDaAmostra(_pw[0], _pw[2], tAgua - dtV, ambiente, relevo);
+    const waterV = clamp((hw - hwAnt) / dtV, -3, 3);
     const sub = Math.min(depth, 1.6);
     const wet = Math.min(1, depth / 0.3);
     wetArea += s.area * wet;

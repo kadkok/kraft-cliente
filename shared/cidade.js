@@ -29,6 +29,7 @@
 import { hash3, createSimplex } from './noise.js';
 import { B } from './blocks.js';
 import { montarCampo } from './bola.js';
+import { criarServicos } from './cidade-servicos.js';
 
 export const CIDADE = {
   chao: 51,            // bloco do chão da cidade (o pé pisa em 52)
@@ -54,6 +55,7 @@ export function criarCidade(ilha) {
     get ruas() { return plano().ruas; },
     get pracas() { return plano().pracas; },
     get estadio() { return plano().estadio; },
+    get servicos() { return plano().servicos; },   // hospital, escola, delegacia, bombeiros, aeroporto (cidade-servicos.js)
     chao(x, z) { return plano().chao(x, z); },       // código do chão da cidade numa coluna (0 = natural; testes e mapa)
   };
 }
@@ -123,9 +125,30 @@ function planejar(ilha) {
   const pinta = (x, z, c) => { const k = ri(x, z); if (k >= 0 && OK[k]) G[k] = c; };
   const pintaP = (x, z, c) => { const k = ri(x, z); if (k >= 0 && OK[k] && PRI[c] >= PRI[G[k]]) G[k] = c; };
   const chao = (x, z) => { const k = ri(x, z); return k >= 0 ? G[k] : 0; };
-  const ocupa = (x0, z0, x1, z1, v = 1) => { for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) { const k = ri(x, z); if (k >= 0) OCC[k] = v; } };
-  const semRua = (x0, z0, x1, z1) => { for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) { const c = chao(x, z); if (c && c !== K.CANTEIRO && c !== K.FLOR && c !== K.SEBE) return false; } return true; };
-  const livre = (x0, z0, x1, z1) => { for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) { const k = ri(x, z); if (k < 0 || OCC[k] || !OK[k]) return false; } return true; };
+  const ocupa = (x0, z0, x1, z1, v = 1) => {
+    const i0 = Math.max(0, x0 - RX0), i1 = Math.min(NW - 1, x1 - RX0);
+    const j0 = Math.max(0, z0 - RZ0), j1 = Math.min(NW - 1, z1 - RZ0);
+    for (let j = j0; j <= j1; j++) { const row = j * NW; for (let i = i0; i <= i1; i++) OCC[row + i] = v; }
+  };
+  const semRua = (x0, z0, x1, z1) => {
+    const i0 = x0 - RX0, i1 = x1 - RX0, j0 = z0 - RZ0, j1 = z1 - RZ0;
+    for (let j = Math.max(0, j0); j <= Math.min(NW - 1, j1); j++) {
+      const row = j * NW;
+      for (let i = Math.max(0, i0); i <= Math.min(NW - 1, i1); i++) {
+        const c = G[row + i]; if (c && c !== K.CANTEIRO && c !== K.FLOR && c !== K.SEBE) return false;
+      }
+    }
+    return true;
+  };
+  const livre = (x0, z0, x1, z1) => {
+    const i0 = x0 - RX0, i1 = x1 - RX0, j0 = z0 - RZ0, j1 = z1 - RZ0;
+    if (i0 < 0 || j0 < 0 || i1 >= NW || j1 >= NW) return false;
+    for (let j = j0; j <= j1; j++) {
+      const row = j * NW;
+      for (let i = i0; i <= i1; i++) { const k = row + i; if (OCC[k] || !OK[k]) return false; }
+    }
+    return true;
+  };
 
   // ---- índice por pedaço ----------------------------------------------------------------------------------------
   const idx = new Map();
@@ -243,10 +266,14 @@ function planejar(ilha) {
     const tronco = tipo === 1 ? B.PINE_LOG : B.LOG, folha = tipo === 1 ? B.PINE_LEAVES : B.LEAVES;
     const yT = 52 + th, topo = tipo === 1 ? yT + 4 : yT + (tipo === 2 ? 3 : 2);
     const k = ri(x, z); if (k >= 0) OCC[k] = 2;
-    poe({ x0: x - ri2, z0: z - ri2, x1: x + ri2, z1: z + ri2, pri: 1, tudo(S) {
-      S(x, 51, z, B.GRASS);
-      for (let y = 52; y < yT; y++) S(x, y, z, tronco);
-      for (let y = yT - 2; y <= topo; y++) for (let dz = -ri2; dz <= ri2; dz++) for (let dx = -ri2; dx <= ri2; dx++) {
+    poe({ x0: x - ri2, z0: z - ri2, x1: x + ri2, z1: z + ri2, pri: 1, tudo(S, X0 = -1e9, Z0 = -1e9, X1 = 1e9, Z1 = 1e9) {
+      if (x >= X0 && x <= X1 && z >= Z0 && z <= Z1) {
+        S(x, 51, z, B.GRASS);
+        for (let y = 52; y < yT; y++) S(x, y, z, tronco);
+      }
+      const dz0 = Math.max(-ri2, Z0 - z), dz1 = Math.min(ri2, Z1 - z);
+      const dx0 = Math.max(-ri2, X0 - x), dx1 = Math.min(ri2, X1 - x);
+      for (let y = yT - 2; y <= topo; y++) for (let dz = dz0; dz <= dz1; dz++) for (let dx = dx0; dx <= dx1; dx++) {
         if (dx === 0 && dz === 0 && y < yT) continue;
         let q, lim;
         if (tipo === 1) { const rr = rad * (topo - y + 0.6) / (topo - yT + 3); q = dx * dx + dz * dz; lim = rr * rr; if (y < yT - 1) continue; }
@@ -255,7 +282,7 @@ function planejar(ilha) {
         const ruido = (hash3(x + dx, y, z + dz, SEM ^ 0x77) & 255) / 255;
         if (q <= lim + 0.6 - ruido * 1.6) S(x + dx, y, z + dz, folha);
       }
-      if (tipo === 0 || tipo === 2) S(x, yT, z, B.LOG);            // galho que segura a copa
+      if ((tipo === 0 || tipo === 2) && x >= X0 && x <= X1 && z >= Z0 && z <= Z1) S(x, yT, z, B.LOG);            // galho que segura a copa
     } });
   }
   function poste(x, z, tipo, dir) {
@@ -474,6 +501,8 @@ function planejar(ilha) {
   }
   // ==============================================================================================================
   // 4) QUARTEIRÕES E LOTES
+  // serviços (24/11): hospital, escola, delegacia e bombeiros tomam quarteirões inteiros; o aeroporto fica no aterro
+  const servicos = criarServicos({ CX, CZ, B, K, H, pinta, ocupa, poe, predios, pracas, arvore, poste });
   const cortes = (a0, a1, wmin, wmax, sem) => {
     const out = []; let a = a0, i = 0;
     while (a <= a1) {
@@ -508,20 +537,18 @@ function planejar(ilha) {
   }
   // Largo do Cais e mercado: os dois quarteirões que encostam na avenida logo depois do cais
   const largo = { u0: -RR, v0: -34, u1: -334, v1: 34 };
-  let mercadoQ = null;
-  const usados = new Set();
+  let mercadoQ = null, nPracinhas = 0;
   for (const q of quarteiroes) {
-    const qi = quarteiroes.indexOf(q);
     q.x0 = W(q.u0); q.z0 = Zw(q.v0); q.x1 = W(q.u1); q.z1 = Zw(q.v1);
     const mu = (q.u0 + q.u1) / 2, mv = (q.v0 + q.v1) / 2, dn = Math.sqrt(mu * mu + mv * mv) / 330;
     const hq = H(q.u0, q.v0, 77);
     const tom = TONS[(hq >>> 3) % TONS.length];
+    if (servicos.quarteirao(q)) continue;
     if (!mercadoQ && q.av === 0 && q.u0 === LINHAS[0] + 7) { mercadoQ = q; continue; }
     // quarteirão só em parte na terra: o que couber vira jardim de bairro
     const inteiro = okCaixa(q.x0, q.z0, q.x1, q.z1, 1);
     const tipoQ = dn < 0.36 ? 'centro' : dn < 0.56 ? 'medio' : dn < 0.74 ? ((hq & 3) === 0 ? 'casas' : 'medio') : 'casas';
     const pracinha = inteiro && tipoQ !== 'centro' && (hq % 11) === 3;
-    usados.add(qi);
     if (pracinha) { pracinhaDe(q, hq); continue; }
     const rua = q.av >= 0;           // encosta na avenida: térreo de loja
     if (tipoQ === 'centro') {
@@ -617,7 +644,7 @@ function planejar(ilha) {
     arvore(cx, cz, 1.25, 0);
     for (const [dx, dz] of [[-9, -9], [9, -9], [-9, 9], [9, 9], [-15, 0], [15, 0], [0, -14], [0, 14]]) if (livre(cx + dx - 2, cz + dz - 2, cx + dx + 2, cz + dz + 2)) arvore(cx + dx, cz + dz, 1);
     for (const [dx, dz] of [[-6, -6], [6, -6], [-6, 6], [6, 6]]) poste(cx + dx, cz + dz, 'praca');
-    pracas.push({ nome: 'Pracinha ' + (pracas.filter((p) => p.nome.startsWith('Pracinha')).length + 1), x: cx, z: cz, raio: Math.min(q.x1 - q.x0, q.z1 - q.z0) >> 1 });
+    pracas.push({ nome: 'Pracinha ' + (++nPracinhas), x: cx, z: cz, raio: Math.min(q.x1 - q.x0, q.z1 - q.z0) >> 1 });
   }
 
   // ==============================================================================================================
@@ -704,9 +731,9 @@ function planejar(ilha) {
       else if (borda) c = K.SEBE;
       else if (q > 1.6 && ru(x * 0.09 + 40, z * 0.09) > 0.55) c = K.FLOR;           // manchas de flores
       if (c) pinta(x, z, c);
+      const k = ri(x, z);
+      if (k >= 0) { const cg = G[k]; OCC[k] = (cg === K.LAGO || cg === K.MARGEM || cg === K.CASCALHO || cg === K.SEBE) ? 1 : 0; }
     }
-    ocupa(x0, z0, x1, z1, 0);
-    for (let z = z0; z <= z1; z++) for (let x = x0; x <= x1; x++) { const c = chao(x, z); if (c === K.LAGO || c === K.MARGEM || c === K.CASCALHO || c === K.SEBE) { const k = ri(x, z); if (k >= 0) OCC[k] = 1; } }
     // ponte em arco de norte a sul cruzando o lago na altura da ilhota
     const bx = lcx - 6;
     let ba = null, bb = null;
@@ -827,8 +854,8 @@ function planejar(ilha) {
     for (let z = q.z0; z <= q.z1; z++) for (let x = q.x0; x <= q.x1; x++) pinta(x, z, ((x - z) & 3) === 0 ? K.PISO_C : K.PISO_A);
     predios.push({ id: predios.length + 1, tipo: 'mercado', x0, z0, x1, z1, y: 52, andares: 1, porta: [(x0 + x1) >> 1, 52, z0], frente: [(x0 + x1) >> 1, 52, q.z0 - 1], altura: 66 });
     pracas.push({ nome: 'Mercado Coberto', x: (x0 + x1) >> 1, z: Math.round(cz), raio: 14, coberto: true });
-    const barracas = [];
-    for (let x = x0 + 3; x + 2 <= x1 - 3; x += 5) for (const zr of [Math.round(cz) - 7, Math.round(cz) + 5]) barracas.push([x, zr, H(x, zr, 707)]);
+    const barracas = [], zr0 = Math.round(cz) - 7, zr1 = Math.round(cz) + 5;
+    for (let x = x0 + 3; x + 2 <= x1 - 3; x += 5) for (const zr of [zr0, zr1]) barracas.push([x, zr, H(x, zr, 707)]);
     poe({ x0: x0 - 1, z0: z0 - 1, x1: x1 + 1, z1: z1 + 1, pri: 2, col(S, x, z) {
       const i = x - x0, j = z - z0, borda = x === x0 || x === x1 || z === z0 || z === z1;
       const fora = x < x0 || x > x1 || z < z0 || z > z1;
@@ -846,13 +873,15 @@ function planejar(ilha) {
       // luminárias penduradas no eixo
       if (Math.abs(z - cz) < 0.6 && ((x - x0) % 8) === 4) { for (let y = 58; y < yr; y++) S(x, y, z, B.STEEL); S(x, 57, z, B.LAMP); }
       // barracas: balcão de tábua, mercadoria, toldo listrado em postes
-      for (const [bx, bz, hb] of barracas) {
-        if (x < bx || x > bx + 2 || z < bz || z > bz + 1) continue;
-        const cor = [B.PLASTER_RED, B.PLASTER_GREEN, B.PLASTER_BLUE, B.PLASTER_YELLOW][hb & 3];
-        const frente = bz < cz ? bz + 1 : bz;
-        if (z === frente) { S(x, 52, z, B.PLANKS); S(x, 53, z, [B.LEAVES, B.PLASTER_YELLOW, B.PLASTER_RED, B.GOLD_BLOCK, B.PLASTER_GREEN, B.LEAVES][(hb >>> (2 + x - bx)) % 6]); }
-        if ((x === bx || x === bx + 2) && z !== frente) for (let y = 52; y <= 54; y++) S(x, y, z, B.LOG);
-        S(x, 55, z, ((x - bx) & 1) ? B.PLASTER_WHITE : cor);
+      if ((z >= zr0 && z <= zr0 + 1) || (z >= zr1 && z <= zr1 + 1)) {
+        for (const [bx, bz, hb] of barracas) {
+          if (x < bx || x > bx + 2 || z < bz || z > bz + 1) continue;
+          const cor = [B.PLASTER_RED, B.PLASTER_GREEN, B.PLASTER_BLUE, B.PLASTER_YELLOW][hb & 3];
+          const frente = bz < cz ? bz + 1 : bz;
+          if (z === frente) { S(x, 52, z, B.PLANKS); S(x, 53, z, [B.LEAVES, B.PLASTER_YELLOW, B.PLASTER_RED, B.GOLD_BLOCK, B.PLASTER_GREEN, B.LEAVES][(hb >>> (2 + x - bx)) % 6]); }
+          if ((x === bx || x === bx + 2) && z !== frente) for (let y = 52; y <= 54; y++) S(x, y, z, B.LOG);
+          S(x, 55, z, ((x - bx) & 1) ? B.PLASTER_WHITE : cor);
+        }
       }
     } });
   }
@@ -950,9 +979,8 @@ function planejar(ilha) {
     for (const [ex, ez] of [[FX - AX - KD - 2, FZ], [FX + AX + KD + 2, FZ], [FX, FZ - AZ - KD - 2], [FX, FZ + AZ + KD + 2]]) estadio.entradas.push([ex, 52, ez]);
     predios.push({ id: predios.length + 1, tipo: 'estadio', x0: estadio.x0, z0: estadio.z0, x1: estadio.x1, z1: estadio.z1, y: 52, andares: 1, porta: [FX - AX - KD, 52, FZ + 3], frente: [FX - AX - KD - 2, 52, FZ + 3], altura: 99 });
     pracas.push({ nome: 'Esplanada do Estádio', x: FX, z: FZ, raio: 90 });
-    const placar = [];                                                                     // letras do placar KRAFT
-    { const txt = 'KRAFT'; let a = -Math.floor((txt.length * 4 - 1) / 2); for (const ch of txt) { const L = LETRAS[ch]; for (let r = 0; r < 5; r++) for (let c2 = 0; c2 < 3; c2++) if (L[r][c2] === '1') placar.push((a + c2) + ',' + (75 - r)); a += 4; } }
-    const placarSet = new Set(placar);
+    const placarSet = new Set();                                                          // letras do placar KRAFT
+    { const txt = 'KRAFT'; let a = -Math.floor((txt.length * 4 - 1) / 2); for (const ch of txt) { const L = LETRAS[ch]; for (let r = 0; r < 5; r++) for (let c2 = 0; c2 < 3; c2++) if (L[r][c2] === '1') placarSet.add(((a + c2 + 32) << 8) | (75 - r)); a += 4; } }
     const corTime = [B.PLASTER_BLUE, B.PLASTER_RED];
     poe({ x0: FX - AX - KD, z0: FZ - AZ - KD, x1: FX + AX + KD, z1: FZ + AZ + KD, pri: 2, col(S, x, z) {
       const dx = x - FX, dz = z - FZ, adx = Math.abs(dx), adz = Math.abs(dz);
@@ -1007,9 +1035,10 @@ function planejar(ilha) {
       if (lateral && Math.abs(dx) <= AX) cobertura(S, x, z, k, p);
       // placar KRAFT sobre a fachada do fundo leste (letras de luz em painel escuro, moldura de aço)
       if (fundo && dx > 0 && adz <= 11) {
+        const dzKey = (dz + 32) << 8;
         for (let y = 69; y <= 77; y++) {
           const bordaP = adz === 11 || y === 69 || y === 77;
-          S(x, y, z, bordaP ? B.STEEL : placarSet.has(dz + ',' + y) ? B.LAMP : B.PLASTER_DARK);
+          S(x, y, z, bordaP ? B.STEEL : placarSet.has(dzKey | y) ? B.LAMP : B.PLASTER_DARK);
         }
       }
     } });
@@ -1068,6 +1097,7 @@ function planejar(ilha) {
   }
 
   // ==============================================================================================================
+  servicos.depois();
   // ordem de carimbo em cada pedaço: miudezas (árvores, postes) antes dos prédios e das obras
   for (const l of idx.values()) l.sort((a, b) => a.pri - b.pri || a.ord - b.ord);
 
@@ -1090,16 +1120,16 @@ function planejar(ilha) {
     if (!l) return;
     const S = (x, y, z, b) => { if (x >= X0 && x <= X1 && z >= Z0 && z <= Z1 && y >= 1 && y <= 140) set(x, y, z, b); };
     for (const it of l) {
-      if (it.tudo) { it.tudo(S); continue; }
+      if (it.tudo) { it.tudo(S, X0, Z0, X1, Z1); continue; }
       const ax = Math.max(X0, it.x0), bx = Math.min(X1, it.x1), az = Math.max(Z0, it.z0), bz = Math.min(Z1, it.z1);
-      for (let z = az; z <= bz; z++) for (let x = ax; x <= bx; x++) it.col(S, x, z);
+      for (let z = az; z <= bz; z++) for (let x = ax; x <= bx; x++) it.col(S, x, z, alt);
     }
   }
 
   return {
-    obras, campo, arquibancadas, arquibancadasFundos, predios, ruas, pracas, estadio,
-    naCidade: (x, z) => { const k = ri(x, z); return k >= 0 && OK[k] === 1; },
-    semPlanta: (x, z) => { const k = ri(x, z); if (k < 0) return false; const c = G[k]; return OCC[k] !== 0 || (c !== 0 && c !== K.CANTEIRO && c !== K.FLOR); },
+    obras, campo, arquibancadas, arquibancadasFundos, predios, ruas, pracas, estadio, servicos: servicos.servicos,
+    naCidade: (x, z) => { const k = ri(x, z); return (k >= 0 && OK[k] === 1) || servicos.ocupado(x, z); },
+    semPlanta: (x, z) => { if (servicos.ocupado(x, z)) return true; const k = ri(x, z); if (k < 0) return false; const c = G[k]; return OCC[k] !== 0 || (c !== 0 && c !== K.CANTEIRO && c !== K.FLOR); },
     // para testes e ferramentas: o código do chão de uma coluna (0 = natural)
     chao,
   };
@@ -1113,15 +1143,22 @@ function colPredio(P, S, x, z) {
   const dc = Math.min(i, j, W - 1 - i, D - 1 - j);
   const n = P.n, ins = P.ins, hT = P.hT, hA = P.hA, y1 = 52 + hT;
   S(x, 51, z, dc === 0 ? P.base : P.piso);
+  const kMax = ins[n - 1];
+  if (dc > kMax + 1) {
+    const centro = i === (W >> 1) && j === (D >> 1);
+    for (let f = 1, y = y1; f < n; f++, y += hA) S(x, y, z, f === 1 && centro ? B.LAMP : P.laje);
+    topo(P, S, x, z, i, j, dc, y1 + (n - 1) * hA, kMax, true);
+    return;
+  }
+  let f = 0, r = 0, hF = hT;
   for (let y = 52; y < 140; y++) {
-    let f, r;
-    if (y < y1) { f = 0; r = y - 52; } else { const q = y - y1; f = 1 + Math.floor(q / hA); r = q - (f - 1) * hA; }
-    if (f >= n) { topo(P, S, x, z, i, j, dc, y, ins[n - 1], true); return; }
+    if (f >= n) { topo(P, S, x, z, i, j, dc, y, kMax, true); return; }
     const k = ins[f];
     if (dc < k) { topo(P, S, x, z, i, j, dc, y, ins[f - 1], false); return; }
     if (dc === k) { const b = fachada(P, f, r, i, j, k, y); S(x, y, z, b === REC ? B.AIR : b); }
     else if (dc === k + 1 && P.rec && r > 0 && recuada(P, f, r, i, j, k, y)) S(x, y, z, P.janela);
     else if (r === 0 && f > 0) S(x, y, z, (dc === k + 1 && ((hash3(x, y, z, 0x1a7e) & 1023) < P.luzes * 1024)) || (f === 1 && i === (W >> 1) && j === (D >> 1)) ? B.LAMP : P.laje);
+    if (++r === hF) { f++; r = 0; hF = hA; }
   }
 }
 // a célula de dentro (anel k + 1) está atrás de uma janela rebaixada?

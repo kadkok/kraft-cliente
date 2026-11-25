@@ -4,6 +4,7 @@ import { B, BLOCKS } from './blocks.js';
 import { MC_BASE, MC_POR_NOME, MC_BLOCOS, mcEstado } from './mc-estados.js';
 import { mcIdDoEstado } from './minis.js';
 import { itemName, STACK } from './items.js';
+import { OBJETOS } from './objetos.js';
 
 const mcItem = (nome) => {
   const i = MC_POR_NOME.get(nome);
@@ -41,6 +42,8 @@ export function matchesIngredient(cell, ing) {
 }
 
 const lv = (b, n = 1) => ({ b, s: 0, n });
+// um objeto (shared/objetos.js) como ingrediente ou resultado
+const ob = (id, n = 1) => ({ b: 0, s: OBJETOS[id].n, n });
 const mc = (nome, n = 1) => {
   const it = mcItem(nome);
   return it ? { b: it.b, s: it.s, n } : null;
@@ -160,6 +163,13 @@ export const RECIPES = [
   shaped('painel_vidro', 'Painel de vidro', 'acabamento', ['GGG', 'GGG'], { G: L.glass }, mc('glass_pane', 16), 3),
   shaped('grade_ferro', 'Grade de ferro', 'acabamento', ['III', 'III'], { I: L.iron }, mc('iron_bars', 16), 3),
 
+  // ---- Lida com os bichos (19/11): corda de junco, sela de armação de madeira, cabresto ----
+  shapeless('corda', 'Corda', 'bichos', [L.reeds, L.reeds, L.reeds], ob('corda', 2), 2),
+  shaped('corda_couro', 'Corda (tiras de couro)', 'bichos', ['C'], { C: ob('couro') }, ob('corda', 2), 2),
+  shaped('cabresto', 'Cabresto', 'bichos', ['RR', 'R '], { R: ob('corda') }, ob('cabresto', 1), 2),
+  shaped('sela', 'Sela', 'bichos', ['PPP', 'R R'], { P: 'planks', R: ob('corda') }, ob('sela', 1), 3),
+  shaped('sela_couro', 'Sela de couro', 'bichos', ['CCC', 'R R'], { C: ob('couro'), R: ob('corda') }, ob('sela', 1), 3),
+
   // ---- Peças de máquinas (3x3 na Mesa de trabalho) ----
   shaped('roda', 'Roda', 'maquinas', [' L ', 'LIL', ' L '], { L: 'log', I: L.iron }, lv(B.WHEEL, 2), 3),
   shaped('assento', 'Assento do piloto', 'maquinas', ['P  ', 'PP ', 'PIP'], { P: 'planks', I: L.iron }, lv(B.SEAT, 1), 3),
@@ -171,6 +181,7 @@ export const RECIPES = [
   shaped('balao', 'Balão', 'maquinas', ['PPP', 'P P', ' C '], { P: 'planks', C: L.coal }, lv(B.BALLOON, 1), 3),
   shaped('canhao', 'Canhão', 'maquinas', ['SSS', 'CS ', 'S  '], { S: L.steel, C: L.coal }, lv(B.CANNON, 1), 3),
   shaped('dinamite', 'Dinamite', 'maquinas', ['SCS', 'CAC', 'SCS'], { S: L.sand, C: L.coal, A: L.ash }, lv(B.DYNAMITE, 2), 3),
+  shaped('super_bomba', 'Super Bomba', 'maquinas', [' D ', 'DCD', ' D '], { D: lv(B.DYNAMITE), C: lv(B.PHANTOM_CRYSTAL) }, lv(B.SUPER_BOMBA), 3),
 ].filter(Boolean);
 
 export const RECIPE_BY_ID = new Map(RECIPES.map((r) => [r.id, r]));
@@ -249,7 +260,7 @@ function matchShapeless(filled, ingredients) {
 
 export function matchGrid(rawCells, size = 3) {
   if (!Array.isArray(rawCells) || rawCells.length !== size * size) return null;
-  const cells = rawCells.map((c) => (Array.isArray(c) && c[0] > 0 ? [c[0] | 0, (c[1] | 0) || 0] : null));
+  const cells = rawCells.map((c) => (Array.isArray(c) && (c[0] > 0 || c[1] > 0) ? [c[0] | 0, (c[1] | 0) || 0] : null));   // objeto: b = 0 e s > 0
   const filled = cells.filter(Boolean);
   if (!filled.length) return null;
   for (const recipe of RECIPES) {

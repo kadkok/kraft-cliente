@@ -28,8 +28,18 @@ export function criarTorcida({ scene, fileiras = [], fundos = [], times, pc = tr
   }
   const n = gente.length, grupo = new THREE.Group(); grupo.name = 'torcida-estadio';
   if (!n) return { n: 0, anima() {}, dispose() {} };
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
+  for (let i = 0; i < n; i++) {
+    const p = gente[i];
+    if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+    if (p.z < minZ) minZ = p.z; if (p.z > maxZ) maxZ = p.z;
+  }
+  const bsCenter = new THREE.Vector3((minX + maxX) * 0.5, (minY + maxY) * 0.5 + 1, (minZ + maxZ) * 0.5);
+  const bsRadius = Math.hypot(maxX - minX, maxY - minY + 3, maxZ - minZ) * 0.5 + 2.5;
+  const bs = new THREE.Sphere(bsCenter, bsRadius);
   const mat = () => new THREE.MeshStandardMaterial({ roughness: 0.85 });
-  const parte = (geo) => { const m = new THREE.InstancedMesh(geo, mat(), n); m.castShadow = false; m.receiveShadow = false; m.frustumCulled = false; grupo.add(m); return m; };
+  const parte = (geo) => { const m = new THREE.InstancedMesh(geo, mat(), n); m.castShadow = false; m.receiveShadow = false; m.boundingSphere = bs; m.frustumCulled = true; grupo.add(m); return m; };
   const gBraco = new THREE.BoxGeometry(0.15, 0.6, 0.15); gBraco.translate(0, -0.26, 0);     // pivô no ombro
   const pernas = parte(new THREE.BoxGeometry(0.4, 0.72, 0.22)), camisa = parte(new THREE.BoxGeometry(0.5, 0.62, 0.27));
   const cabeca = parte(new THREE.BoxGeometry(0.4, 0.4, 0.4)), cabelo = parte(new THREE.BoxGeometry(0.43, 0.13, 0.43));

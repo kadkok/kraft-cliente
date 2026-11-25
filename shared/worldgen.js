@@ -1072,8 +1072,31 @@ function createNanoGen(seed, opt) {
   const S = hash3(at[0], at[1], at[2], seed ^ 0x4e616e6f);
   const sn = createSimplex(S);
   const n2 = sn.n2, n3 = sn.n3;
-  const theme = nanoTheme(block);
+  // a rocha-mãe mais funda do mundo de cima (y = Y_MIN) não é "rocha": é a porta do mundo mítico (só o GM atravessa;
+  // server/mitico.js). Mesmo plano nano de sempre, outro desenho (colunaMitica).
+  const theme = block === B.BEDROCK && at[1] === Y_MIN ? 'mitico' : nanoTheme(block);
   const N = FRACTAL;
+  // Mundo mítico (Kadmus, 23/11/2026): planície de pedra-sombra com veios de água mística acesa, agulhas de cristal
+  // fantasma, lanternas e ilhas de mármore flutuando no alto. Determinístico pela semente e pelo ponto.
+  const hMitico = (x, z) => Math.max(8, Math.min(40, Math.floor(22 + 9 * n2(x * 0.03, z * 0.03) + 4 * n2(x * 0.11 + 5, z * 0.11 - 2))));
+  const veioMitico = (x, z) => Math.abs(n2(x * 0.045 + 31, z * 0.045 - 17)) < 0.06;
+  function colunaMitica(vox, i, wx, wz) {
+    const r = rand2(wx, wz, S), h = hMitico(wx, wz);
+    vox[i] = B.BEDROCK;
+    for (let y = 1; y <= h; y++) vox[i + (y << 8)] = y === h ? B.SHADOW_STONE : y > h - 3 ? B.DEEP_STONE : B.BASALT;
+    let top = h;
+    if (veioMitico(wx, wz)) vox[i + (h << 8)] = B.MYSTIC_WATER;
+    else if (r > 0.985) { const a = 3 + Math.floor(r * 9973 % 9); for (let k = 1; k <= a; k++) vox[i + ((h + k) << 8)] = k === a ? B.PHANTOM_CRYSTAL : B.CRYSTAL_ORE; top = h + a; }
+    else if (r < 0.006) { vox[i + ((h + 1) << 8)] = B.LAMP; top = h + 1; }
+    const ilha = n2(wx * 0.035 + 101, wz * 0.035 - 77);
+    if (ilha > 0.38) {
+      const meio = 58 + Math.floor(6 * n2(wx * 0.02, wz * 0.02)), esp = Math.floor((ilha - 0.38) * 22) + 1;
+      for (let y = meio - esp; y <= meio; y++) vox[i + (y << 8)] = y === meio ? B.MARBLE : B.SHADOW_STONE;
+      if (r > 0.97 && r < 0.976) vox[i + ((meio + 1) << 8)] = B.LAMP;
+      top = Math.max(top, meio + 1);
+    }
+    return top;
+  }
   const hgt = (x, z) => {
     let h = 34 + 20 * n2(x * 0.021, z * 0.021) + 7 * n2(x * 0.07 + 9, z * 0.07 - 3);
     if (theme === 'madeira') h = 30 + 12 * n2(x * 0.012, z * 0.11) + 5 * n2(x * 0.05, z * 0.4);   // veios da madeira
@@ -1093,6 +1116,7 @@ function createNanoGen(seed, opt) {
         maxY = N + 6;
         continue;
       }
+      if (theme === 'mitico') { const t = colunaMitica(vox, i, wx, wz); if (t > maxY) maxY = t; continue; }
       const h = hgt(wx, wz), r = rand2(wx, wz, S);
       let top = B.STONE, sub = B.STONE, deep = B.BASALT, spire = 0, spireH = 0, water = 0;
       if (theme === 'rocha') { top = sub = block === B.BASALT || block === B.SHADOW_STONE ? block : B.STONE; if (r > 0.992) { spire = block >= B.COAL_ORE && block <= B.CRYSTAL_ORE ? block : B.CRYSTAL_ORE; spireH = 2 + Math.floor(r * 997 % 6); } }
@@ -1123,10 +1147,16 @@ function createNanoGen(seed, opt) {
     return emCamadas(vox, maxY);
   }
   return {
-    seed, dim: DIM_NANO0, fundo: 0, generate, height: (x, z) => (x < 0 || x >= N || z < 0 || z >= N ? N + 6 : hgt(x, z)), heightRel: () => 0, biomeAt: () => 0,
+    seed, dim: DIM_NANO0, fundo: 0, generate, height: (x, z) => (x < 0 || x >= N || z < 0 || z >= N ? N + 6 : theme === 'mitico' ? hMitico(x, z) : hgt(x, z)), heightRel: () => 0, biomeAt: () => 0,
     climateGrid(x0, z0, n, outT, outM) { outT.fill(theme === 'gelo' ? 0.1 : 0.55); outM.fill(theme === 'areia' ? 0.2 : 0.7); },
     lapse: () => 0,
-    findSpawn() { const y = hgt(50, 50); return { x: 50.5, y: (theme === 'agua' ? 59 : y) + 1.05, z: 50.5 }; },
+    findSpawn() {
+      if (theme === 'mitico') {   // chão limpo (sem agulha, lanterna, veio nem ilha em cima) perto do meio
+        for (let k = 0; k < 400; k++) { const x = 50 + (k % 20) - 10, z = 50 + Math.floor(k / 20) - 10, r = rand2(x, z, S);
+          if (r <= 0.985 && r >= 0.006 && !veioMitico(x, z) && n2(x * 0.035 + 101, z * 0.035 - 77) <= 0.38) return { x: x + 0.5, y: hMitico(x, z) + 1.05, z: z + 0.5 }; }
+      }
+      const y = hgt(50, 50); return { x: 50.5, y: (theme === 'agua' ? 59 : y) + 1.05, z: 50.5 };
+    },
     theme,
   };
 }

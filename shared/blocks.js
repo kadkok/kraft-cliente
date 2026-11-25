@@ -70,7 +70,8 @@ export const B = {
   // (shared/minerios.js: faixas de fundura, raridade e valor). Camadas de textura emprestadas até o Astra desenhar as
   // próprias (contrato no topo de shared/minerios.js).
   DEEP_STONE: 110, SAPPHIRE_ORE: 111, EMERALD_ORE: 112, RUBY_ORE: 113, DIAMOND_ORE: 114,
-  MAGMA: 115,   // crosta de lava com frestas acesas: o lago da cratera e os veios do vulcão (shared/ilhas.js)
+  MAGMA: 115, SUPER_BOMBA: 116,
+  VISAO: 126,   // visão unilateral (23/11): por fora a face do bloco escolhido, por dentro transparente (shared/minis.js → VISAO_BASE)   // crosta de lava com frestas acesas: o lago da cratera e os veios do vulcão (shared/ilhas.js)
 };
 
 export const GLASS_IDS = [B.GLASS,B.GLASS_SMOKE,B.GLASS_GOLD,B.GLASS_SILVER,B.GLASS_MIRROR,B.GLASS_BLUE,B.GLASS_RED];
@@ -78,7 +79,7 @@ export const STAIR_IDS = [
   B.STAIR_PLANKS, B.STAIR_PINE, B.STAIR_STONE, B.STAIR_STONE_BRICKS,
   B.STAIR_BRICKS, B.STAIR_MARBLE, B.STAIR_SANDSTONE, B.STAIR_CONCRETE,
 ];
-export const BLOCK_COUNT = 116;
+export const BLOCK_COUNT = 117;
 const N = 128; // folga para os arrays tipados
 export const IS_GLASS = new Uint8Array(N);
 for (const id of GLASS_IDS) IS_GLASS[id] = 1;
@@ -219,6 +220,7 @@ const DIR_NAMES = ['+X', '-X', '+Y', '-Y', '+Z', '-Z'];
 def(B.MOTOR, { name: 'Motor', tex: { side: 'engine_side', top: 'engine_top' }, hard: 1.5, sound: 'metal', group: 'máquina', func: F_MOTOR, mass: 2.5 });
 def(B.GYRO, { name: 'Giroscópio', tex: 'gyro', hard: 1.2, sound: 'metal', group: 'máquina', func: F_GYRO, mass: 1.2 });
 def(B.DYNAMITE, { name: 'Dinamite', tex: { side: 'dynamite_side', top: 'dynamite_top' }, hard: 0.3, sound: 'wood', group: 'máquina', func: F_DYNAMITE, mass: 0.8 });
+def(B.SUPER_BOMBA, { name: 'Super Bomba', tex: { side: 'dynamite_side', top: 'phantom_crystal', bottom: 'metal_dark' }, hard: 0.5, sound: 'metal', group: 'máquina', mass: 2, emit: 7 });
 def(B.BALLOON, { name: 'Balão', kind: K_MODEL, tex: 'balloon', hard: 0.2, sound: 'leaves', group: 'máquina', func: F_BALLOON, mass: 0.1 });
 for (let f = 0; f < 6; f++) {
   // propulsor: bocal na face oposta ao empuxo, entrada de ar na face do empuxo
@@ -246,6 +248,7 @@ def(B.MYSTIC_WATER, { natural: true, name: 'Água mística', tex: 'mystic_water'
 
 // Blocos do Minecraft. Até a malha própria (fase 3) eles se desenham com uma textura do LAVRA; não estão na paleta.
 def(B.MC_SOLIDO, { name: 'Bloco do Minecraft', tex: 'stone', hard: 1.5, sound: 'stone', group: 'minecraft', placeable: false });
+def(B.VISAO, { name: 'Visão unilateral', kind: K_CUBE, opaque: false, tex: 'glass', hard: 0.6, sound: 'glass', group: 'construcao', placeable: false, drop: 0 });   // /visao (server/visao.js)
 def(B.MC_RECORTE, { name: 'Bloco do Minecraft (recorte)', kind: K_CUTOUT, tex: 'glass', hard: 0.5, sound: 'glass', group: 'minecraft', placeable: false });
 def(B.MC_FORMA, { name: 'Peça do Minecraft', kind: K_MODEL, tex: 'planks', hard: 0.8, sound: 'wood', group: 'minecraft', placeable: false });
 def(B.DEEP_STONE, { natural: true, name: 'Rocha profunda', tex: 'shadow_stone', hard: 2.2, sound: 'stone' });
@@ -299,7 +302,7 @@ export const PALETTE = [
   B.COAL_ORE, B.IRON_ORE, B.COPPER_ORE, B.GOLD_ORE, B.CRYSTAL_ORE, B.SAPPHIRE_ORE, B.EMERALD_ORE, B.RUBY_ORE, B.DIAMOND_ORE,
   B.TALL_GRASS, B.FERN, B.FLOWER_YELLOW, B.FLOWER_RED, B.FLOWER_BLUE, B.FLOWER_WHITE, B.DRY_SHRUB, B.REEDS,
   B.WATER,
-  B.SEAT, B.MOTOR, B.WHEEL, B.PROPELLER, B.THRUSTER, B.WING + 1, B.GYRO, B.BALLOON, B.CANNON, B.DYNAMITE,
+  B.SEAT, B.MOTOR, B.WHEEL, B.PROPELLER, B.THRUSTER, B.WING + 1, B.GYRO, B.BALLOON, B.CANNON, B.DYNAMITE, B.SUPER_BOMBA,
   B.SHADOW_STONE, B.ASH, B.PHANTOM_CRYSTAL, B.MYSTIC_WATER,
 ];
 

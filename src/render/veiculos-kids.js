@@ -31,10 +31,17 @@ export function criarVisual(tipo) {
     copia.scale.setScalar(VEICULOS[tipo].escala);
     copia.traverse((o) => {
       if (o.isMesh) {
-        o.castShadow = true;
+        o.castShadow = Array.isArray(o.material)
+          ? o.material.some(m => !m.transparent)
+          : !o.material.transparent;
         o.receiveShadow = true;
       }
       if (o.name.startsWith('giro_')) giram.push([o, o.name.split('_')[1]]);
+      else if (!o.isBone) {
+        // A peça acompanha o movimento do pai. Só o pivô animado precisa recompor sua matriz local.
+        o.updateMatrix();
+        o.matrixAutoUpdate = false;
+      }
     });
     raiz.add(copia);
   });
@@ -47,7 +54,7 @@ export function criarVisual(tipo) {
       for (const [o, eixo] of giram) {
         let taxa = v.v * 3;
         if (tipo === 'helicoptero') taxa = v.rpm * (eixo === 'y' ? 22 : 30);
-        if (tipo === 'aviao') taxa = 6 + Math.max(0, v.v) * 3;
+        if (tipo === 'aviao') taxa = v.rpm > 0 ? 48 * v.rpm : Math.max(0, v.v) * 3;
         o.rotation[eixo] += taxa * dt;
       }
     },
@@ -60,6 +67,13 @@ export function criarVisual(tipo) {
   };
 }
 
+export function emissaoRastro(v) {
+  if (v?.tipo === 'aviao' && v.voo && v.fumaca) return 'fumaca';
+  if (v?.tipo !== 'barco' && v?.tipo !== 'submarino') return null;
+  if (v.prof < -0.9) return Math.abs(v.vy) > 0.4 ? 'bolhas' : null;
+  return Math.abs(v.v) > 1 ? 'espuma' : null;
+}
+
 export function criarRastro(scene) {
   const n = 40,
     pos = new Float32Array(n * 3),
@@ -67,7 +81,7 @@ export function criarRastro(scene) {
   let proximo = 0,
     tempo = 0,
     espera = 0;
-  const vida = new Float32Array(n),
+  const vida = new Float32Array(n), sobe = new Uint8Array(n),
     cor = new THREE.Color();
   pos.fill(-10000);
   const geom = new THREE.BufferGeometry();
@@ -85,13 +99,12 @@ export function criarRastro(scene) {
   pontos.visible = false;
   scene.add(pontos);
   return {
-    atualizar(v, dt) {
+    atualizar(v, dt, emissao = null) {
+      if (!emissao && !pontos.visible) return;
       tempo += dt;
       espera -= dt;
-      const fuma = v?.tipo === 'aviao' && v.voo && v.fumaca;
-      const bolhas = v?.tipo === 'submarino' && v.prof < -0.9;
-      const espuma = v && (v.tipo === 'barco' || v.tipo === 'submarino') && !bolhas && Math.abs(v.v) > 1;
-      if ((fuma || bolhas || espuma) && espera <= 0) {
+      const fuma = emissao === 'fumaca', bolhas = emissao === 'bolhas', espuma = emissao === 'espuma';
+      if (emissao && espera <= 0) {
         espera = fuma ? 0.09 : 0.14;
         const i = proximo;
         proximo = (proximo + 1) % n;
@@ -105,6 +118,7 @@ export function criarRastro(scene) {
         else cor.set(0xd1f6ff);
         cor.toArray(cores, i * 3);
         vida[i] = fuma ? 3 : 1.45;
+        sobe[i] = espuma ? 0 : 1;
         geom.attributes.color.needsUpdate = true;
       }
       let vis = false;
@@ -114,7 +128,7 @@ export function criarRastro(scene) {
           if (vida[i] <= 0) pos[i * 3 + 1] = -10000;
           else {
             vis = true;
-            if (!espuma) pos[i * 3 + 1] += dt * 0.22;
+            if (sobe[i]) pos[i * 3 + 1] += dt * 0.22;
           }
         }
       if (vis || pontos.visible) geom.attributes.position.needsUpdate = true;

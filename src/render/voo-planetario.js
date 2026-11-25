@@ -137,6 +137,19 @@ void main(){
   vec3 ar=mix(horizonte,zenite,smoothstep(-.1,.8,d.y));
   vec3 vazio=mix(vec3(.0018,.0032,.009),vec3(.006,.014,.033),dia);
   vec3 ceu=mix(ar,vazio,espaco);
+  // atmosfera espacial (Kadmus, 23/11/2026): fora do planeta o céu fica preto de verdade, com estrelas fixas e a faixa
+  // da Via Láctea, que acendem com espaco (sem ar não há céu azul nem cintilação; o Sol continua um disco).
+  if(espaco>.001){
+    vec3 cel=floor(d*360.);
+    float hs=fract(sin(dot(cel,vec3(12.9898,78.233,37.719)))*43758.5453);
+    vec3 fr=fract(d*360.)-.5;
+    float est=step(.9965,hs)*smoothstep(.5,.08,length(fr))*(.45+.55*fract(hs*91.7));
+    vec3 tom=mix(vec3(.75,.85,1.),vec3(1.,.86,.7),fract(hs*13.1));
+    vec3 eixoVia=normalize(vec3(.32,.55,-.77));
+    float via=exp(-pow(dot(d,eixoVia)*5.5,2.));
+    ceu=mix(ceu,vazio*.6,espaco*.5);
+    ceu+=(tom*est*2.2+vec3(.035,.04,.06)*via)*espaco;
+  }
   float disco=smoothstep(.99989,.99997,dot(d,sol));
   ceu+=vec3(1.7,1.42,1.1)*disco;
   float distBorda=abs(perp-raio)/raio;

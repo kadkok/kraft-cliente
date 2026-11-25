@@ -14,7 +14,7 @@ import { U, COMMON } from './materials.js';
 import * as Geo from './recife/geometria.js';
 import { MAR_NIVEL } from '../../shared/mar.js';
 
-const S = { rock: 0, star: 1, brain: 2, brainWide: 3, porites: 4, acropora: 5, finger: 6, fire: 7, plate: 8, pillar: 9, gorgonian: 10, sponge: 11, urchin: 12, anemone: 13, rubble: 14, grass: 15, fan: 16, plume: 17, lettuce: 18, algae: 19, sargassum: 20 };
+const S = { rock: 0, star: 1, brain: 2, brainWide: 3, porites: 4, acropora: 5, finger: 6, fire: 7, plate: 8, pillar: 9, gorgonian: 10, sponge: 11, urchin: 12, anemone: 13, rubble: 14, grass: 15, fan: 16, plume: 17, lettuce: 18, algae: 19, sargassum: 20, kelp: 21, iridescent: 22, magenta: 23, ship: 24, whale: 25 };
 const MODELS = {
   rock: (r, l) => Geo.createMound(r, l, 'rock'), slab: (r, l) => Geo.createMound(r, l, 'slab'), boulder: (r, l) => Geo.createMound(r, l, 'boulder'),
   knobby: (r, l) => Geo.createMound(r, l, 'knobby'), dome: Geo.createDome, lobes: Geo.createLobes, pillars: Geo.createPillars, elkhorn: Geo.createElkhorn,
@@ -23,6 +23,8 @@ const MODELS = {
   anemone: Geo.createAnemone, rubble: Geo.createRubble, grass: Geo.createSeagrass, fan: Geo.createSeaFan, plume: Geo.createSeaPlume, lettuce: Geo.createLettuce,
   wallPlates: Geo.createWallPlates, wire: Geo.createWireCoral, blackCoral: Geo.createBlackCoral, ear: Geo.createEarSponge, meadow: Geo.createMeadow,
   halimeda: Geo.createHalimeda, penicillus: Geo.createPenicillus, sargassum: Geo.createSargassum, starfish: Geo.createStarfish, cucumber: Geo.createCucumber, conch: Geo.createConch,
+  kelpColumn: Geo.createKelpColumn, iridescentFoliage: Geo.createIridescentFoliage, magentaCover: Geo.createMagentaCover,
+  rockArch: Geo.createRockArch, sunkenShipHull: Geo.createSunkenShipHull, whaleFluke: Geo.createWhaleFlukeSculpture,
 };
 // tipo: modelo, superfície, balanço, tamanho, esticar (y, xz), alinhar ao fundo, enterrar, paletas (sRGB)
 const TYPES = {
@@ -65,16 +67,22 @@ const TYPES = {
   cucumber: { model: 'cucumber', s: S.sponge, scale: [0.8, 1.4], sy: [0.9, 1.1], sxz: [0.8, 1.2], align: 1.0, sink: 0.05, c1: [0x3a2a1e, 0x4a3424, 0x2e2420], c2: [0x2a1e18] },
   conch: { model: 'conch', s: S.rubble, scale: [0.8, 1.3], sy: [0.9, 1.1], sxz: [0.9, 1.1], align: 1.0, sink: 0.15, c1: [0xa09484], c2: [0xd8a090, 0xe0b098] },
   sargassum: { model: 'sargassum', s: S.sargassum, flex: 0.9, scale: [0.7, 1.5], sy: [0.8, 1.3], sxz: [0.85, 1.15], align: 0.2, sink: 0.0, c1: [0x8a6a2a, 0x9a7a32, 0x7a5e26, 0xa08036], c2: [0x6a5a26] },
+  kelp: { model: 'kelpColumn', s: S.kelp, flex: 1.15, scale: [5.5, 13.5], sy: [0.9, 1.2], sxz: [0.85, 1.2], align: 0.05, sink: 0.01, c1: [0x2a7a3b, 0x368842, 0x42943e, 0x2e6e36], c2: [0xd4b83a, 0x8ce25a, 0xf2d04b] },
+  iridescent: { model: 'iridescentFoliage', s: S.iridescent, flex: 0.52, scale: [1.1, 2.3], sy: [0.85, 1.25], sxz: [0.85, 1.2], align: 0.25, sink: 0.02, c1: [0x7e289e, 0x942ab4, 0x6a228c, 0xa8329c], c2: [0xff5cd6, 0x52e5ff, 0xff7ae2] },
+  magenta: { model: 'magentaCover', s: S.magenta, flex: 0.18, scale: [1.2, 2.5], sy: [0.8, 1.2], sxz: [0.9, 1.25], align: 0.85, sink: 0.01, c1: [0xb81d7a, 0xc82286, 0x9e1868, 0xd42c92], c2: [0xff6ee0, 0xe052ff, 0xff8ae8] },
+  arch: { model: 'rockArch', s: S.rock, flex: 0.0, scale: [4.2, 7.2], sy: [0.85, 1.15], sxz: [0.85, 1.2], align: 0.15, sink: 0.08, c1: [0x6c6258, 0x786c60, 0x5e564e], c2: [0xb45c96, 0x4ca878, 0xc472a8] },
+  shipHull: { model: 'sunkenShipHull', s: S.ship, flex: 0.0, scale: [5.4, 7.6], sy: [0.95, 1.1], sxz: [0.95, 1.1], align: 0.35, sink: 0.06, c1: [0x583e2a, 0x4c3422, 0x624630], c2: [0x3c8c64, 0xb85a94] },
+  whaleFluke: { model: 'whaleFluke', s: S.whale, flex: 0.0, scale: [5.2, 7.4], sy: [0.95, 1.12], sxz: [0.95, 1.1], align: 0.12, sink: 0.05, c1: [0x5e6e78, 0x52626c, 0x687882], c2: [0x52d6b4, 0xd8b84a] },
 };
 // abundância por zona [crista, frente, trás, manchas, talude] em cada camada (Reef.js → LAYERS); espaçamento ×1,5
 // em relação ao Tidewater (o mundo do LAVRA tem muito mais recife em volta da ilha)
 const LAYERS = [
-  { occ: 0, spacing: 3.0, allow: 0.45, types: { slab: [1.5, 1.2, 1.5, 1.5, 0.8], rock: [1.8, 1.8, 1.6, 2, 1.2], boulder: [1.2, 3, 0.7, 1.8, 2.0], lobes: [0.4, 2.4, 0.4, 1.2, 1.8], brainWide: [1.0, 1.5, 0.5, 1.0, 0.8], elkhorn: [5, 0.3, 0, 0, 0], barrel: [0, 0.5, 0, 0.1, 0.3], barrelDeep: [0, 0, 0, 0, 1.4], pillar: [0.05, 0.2, 0.02, 0.05, 0], plate: [0, 0.35, 0, 0.15, 0.4], wallPlate: [0, 0.1, 0, 0, 1.6], ear: [0, 0.1, 0, 0.05, 0.4] } },
-  { occ: 1, spacing: 0.85, allow: 0.25, types: { brain: [1.2, 0.9, 0.5, 0.8, 0.5], knobby: [1.4, 0.7, 0.7, 0.7, 0.3], starlet: [0.3, 0.5, 1.0, 0.5, 0.3], staghorn: [0.8, 4, 0.5, 1.2, 0.3], finger: [0.5, 0.4, 2, 0.6, 0], fire: [1.2, 0.15, 0.2, 0.2, 0], plate: [0, 0.25, 0, 0.1, 0.6], lobes: [0.2, 0.8, 0.2, 0.5, 0.7], elkhorn: [2.5, 0.15, 0, 0, 0], lettuce: [0.3, 0.9, 0.9, 0.6, 0.8], wallPlate: [0, 0, 0, 0, 1.0], rod: [0.6, 1.0, 0.6, 0.8, 0.3], fan: [0.8, 0.5, 0.2, 0.5, 0.2], plume: [0.2, 0.6, 0.3, 0.4, 0.2], tube: [0.4, 1.6, 0.2, 0.7, 1.4], vase: [0.1, 0.8, 0, 0.3, 1.0], rope: [0.2, 0.7, 0.2, 0.4, 0.8], ear: [0, 0.3, 0, 0.1, 0.9], anemone: [0.2, 0.2, 0.15, 0.15, 0.05], sargassum: [1.6, 0.15, 0.5, 0.2, 0] } },
-  { occ: 4, spacing: 1.15, allow: 0.3, types: { rod: [2.2, 3.6, 1.4, 2.4, 1.2], plume: [0.8, 2.4, 0.8, 1.4, 1.0], whip: [0.5, 1.3, 0.6, 1.0, 1.0], fan: [2.0, 1.2, 0.3, 0.9, 0.3], fanDeep: [0, 0.2, 0, 0.1, 2.2], wire: [0, 0.05, 0, 0, 1.2], blackCoral: [0, 0, 0, 0, 0.8] } },
-  { occ: 2, spacing: 0.6, allow: 0.12, types: { urchin: [0.3, 0.15, 0.4, 0.2, 0.05], rubble: [0.5, 0.8, 1.0, 0.7, 0.4], knobby: [0.3, 0.15, 0.2, 0.15, 0.1], brain: [0.15, 0.15, 0.1, 0.1, 0.1], rod: [0.4, 0.6, 0.3, 0.4, 0.3], fan: [0.3, 0.2, 0.1, 0.2, 0.2], finger: [0.2, 0.2, 0.6, 0.2, 0], starlet: [0.1, 0.15, 0.3, 0.15, 0.1], plume: [0.2, 0.3, 0.2, 0.2, 0.2], staghorn: [0.2, 0.8, 0.1, 0.2, 0], tube: [0.1, 0.35, 0.05, 0.15, 0.4], lettuce: [0.1, 0.3, 0.3, 0.2, 0.2], sargassum: [1.4, 0.1, 0.4, 0.1, 0], halimeda: [0.3, 0.25, 1.4, 0.5, 0.2], penicillus: [0.1, 0.05, 0.6, 0.2, 0] } },
+  { occ: 0, spacing: 3.0, allow: 0.45, types: { slab: [1.5, 1.2, 1.5, 1.5, 0.8], rock: [1.8, 1.8, 1.6, 2, 1.2], boulder: [1.2, 3, 0.7, 1.8, 2.0], lobes: [0.4, 2.4, 0.4, 1.2, 1.8], brainWide: [1.0, 1.5, 0.5, 1.0, 0.8], elkhorn: [5, 0.3, 0, 0, 0], barrel: [0, 0.5, 0, 0.1, 0.3], barrelDeep: [0, 0, 0, 0, 1.4], pillar: [0.05, 0.2, 0.02, 0.05, 0], plate: [0, 0.35, 0, 0.15, 0.4], wallPlate: [0, 0.1, 0, 0, 1.6], ear: [0, 0.1, 0, 0.05, 0.4], arch: [0, 0.08, 0, 0.06, 0.22] } },
+  { occ: 1, spacing: 0.85, allow: 0.25, types: { brain: [1.2, 0.9, 0.5, 0.8, 0.5], knobby: [1.4, 0.7, 0.7, 0.7, 0.3], starlet: [0.3, 0.5, 1.0, 0.5, 0.3], staghorn: [0.8, 4, 0.5, 1.2, 0.3], finger: [0.5, 0.4, 2, 0.6, 0], fire: [1.2, 0.15, 0.2, 0.2, 0], plate: [0, 0.25, 0, 0.1, 0.6], lobes: [0.2, 0.8, 0.2, 0.5, 0.7], elkhorn: [2.5, 0.15, 0, 0, 0], lettuce: [0.3, 0.9, 0.9, 0.6, 0.8], wallPlate: [0, 0, 0, 0, 1.0], rod: [0.6, 1.0, 0.6, 0.8, 0.3], fan: [0.8, 0.5, 0.2, 0.5, 0.2], plume: [0.2, 0.6, 0.3, 0.4, 0.2], tube: [0.4, 1.6, 0.2, 0.7, 1.4], vase: [0.1, 0.8, 0, 0.3, 1.0], rope: [0.2, 0.7, 0.2, 0.4, 0.8], ear: [0, 0.3, 0, 0.1, 0.9], anemone: [0.2, 0.2, 0.15, 0.15, 0.05], sargassum: [1.6, 0.15, 0.5, 0.2, 0], iridescent: [0.4, 1.3, 0.35, 0.9, 1.1], magenta: [0.6, 1.4, 0.8, 1.1, 0.9] } },
+  { occ: 4, spacing: 1.15, allow: 0.3, types: { rod: [2.2, 3.6, 1.4, 2.4, 1.2], plume: [0.8, 2.4, 0.8, 1.4, 1.0], whip: [0.5, 1.3, 0.6, 1.0, 1.0], fan: [2.0, 1.2, 0.3, 0.9, 0.3], fanDeep: [0, 0.2, 0, 0.1, 2.2], wire: [0, 0.05, 0, 0, 1.2], blackCoral: [0, 0, 0, 0, 0.8], kelp: [0, 1.4, 0, 1.1, 3.2], iridescent: [0.3, 1.1, 0.2, 0.8, 1.2] } },
+  { occ: 2, spacing: 0.6, allow: 0.12, types: { urchin: [0.3, 0.15, 0.4, 0.2, 0.05], rubble: [0.5, 0.8, 1.0, 0.7, 0.4], knobby: [0.3, 0.15, 0.2, 0.15, 0.1], brain: [0.15, 0.15, 0.1, 0.1, 0.1], rod: [0.4, 0.6, 0.3, 0.4, 0.3], fan: [0.3, 0.2, 0.1, 0.2, 0.2], finger: [0.2, 0.2, 0.6, 0.2, 0], starlet: [0.1, 0.15, 0.3, 0.15, 0.1], plume: [0.2, 0.3, 0.2, 0.2, 0.2], staghorn: [0.2, 0.8, 0.1, 0.2, 0], tube: [0.1, 0.35, 0.05, 0.15, 0.4], lettuce: [0.1, 0.3, 0.3, 0.2, 0.2], sargassum: [1.4, 0.1, 0.4, 0.1, 0], halimeda: [0.3, 0.25, 1.4, 0.5, 0.2], penicillus: [0.1, 0.05, 0.6, 0.2, 0], magenta: [0.4, 0.9, 0.6, 0.7, 0.5] } },
   // areia: vida miúda espalhada, capim marinho em prados
-  { occ: 3, spacing: 1.4, allow: -1, sand: true, types: { meadow: [0, 0, 2.5, 0.6, 0], starfish: [0.1, 0.2, 0.5, 0.3, 0.1], cucumber: [0, 0.1, 0.3, 0.2, 0.3], conch: [0.1, 0.1, 0.4, 0.2, 0.05], halimeda: [0.1, 0.1, 0.6, 0.2, 0], penicillus: [0, 0.05, 0.5, 0.1, 0] } },
+  { occ: 3, spacing: 1.4, allow: -1, sand: true, types: { meadow: [0, 0, 2.5, 0.6, 0], starfish: [0.1, 0.2, 0.5, 0.3, 0.1], cucumber: [0, 0.1, 0.3, 0.2, 0.3], conch: [0.1, 0.1, 0.4, 0.2, 0.05], halimeda: [0.1, 0.1, 0.6, 0.2, 0], penicillus: [0, 0.05, 0.5, 0.1, 0], magenta: [0, 0.3, 0.6, 0.4, 0.2] } },
 ];
 
 const CEL = 16, RAIO = 58, PERTO = 13;
@@ -177,16 +185,184 @@ void main() {
   } else if (st == ${S.anemone}.0) { alb = mix(alb, vC2, smoothstep(0.4, 1.0, t));
   } else if (st == ${S.grass}.0 || st == ${S.algae}.0 || st == ${S.sargassum}.0) {
     alb = mix(alb, vC2, smoothstep(0.8, 1.0, t) * 0.5);
+  } else if (st == ${S.kelp}.0) {                   // kelp gigante com nervuras translúcidas e fagulhas verde/ouro
+    float rib = abs(sin(vLocal.y * 28.0 + vn3(P * 8.0) * 3.0));
+    alb = mix(alb, vC2 * 0.82, smoothstep(0.55, 1.0, t) * 0.42 + (1.0 - rib) * 0.18 * step(0.5, part));
+  } else if (st == ${S.iridescent}.0 || st == ${S.magenta}.0) {  // folhagem roxo/rosa iridescente e tapete magenta
+    alb = mix(alb, vC2, smoothstep(0.35, 0.95, t) * 0.65 + part * 0.25);
+  } else if (st == ${S.ship}.0) {                   // casco de galeão naufragado: tábuas escuras + musgo/cracas
+    float plank = smoothstep(0.1, 0.25, abs(fract(vLocal.y * 5.5 + n1 * 0.4) - 0.5));
+    alb *= 0.72 + 0.28 * plank;
+    alb = mix(alb, vC2, smoothstep(0.15, 0.55, n1 + 0.35) * (0.4 + 0.4 * part));
+  } else if (st == ${S.whale}.0) {                  // escultura de cauda de baleia em pedra com pátina dourada/turquesa
+    alb = mix(alb, vC2, smoothstep(0.2, 0.75, n1 + part * 0.45) * 0.58);
   } else if (st == ${S.rubble}.0) { alb = mix(alb, vC2, smoothstep(0.2, 0.5, n1 + 0.3) * 0.6); }
   vec3 N = normalize(vN); if (!gl_FrontFacing) N = -N;
   vec3 V = normalize(cameraPosition - vWorld);
   float prof = max(${MAR_NIVEL.toFixed(2)} - vWorld.y, 0.0);
   float ndl = max(dot(N, uLightDir), 0.0);
   float cau = causticas(vWorld.xz + N.xz * 0.3, uTime) * smoothstep(-0.2, 0.6, N.y) * exp(-prof * 0.08);
-  float fino = (st == ${S.gorgonian}.0 || st == ${S.fan}.0 || st == ${S.grass}.0 || st == ${S.algae}.0 || st == ${S.sargassum}.0 || st == ${S.plume}.0) ? 0.35 : 0.0;
+  float fino = (st == ${S.gorgonian}.0 || st == ${S.fan}.0 || st == ${S.grass}.0 || st == ${S.algae}.0 || st == ${S.sargassum}.0 || st == ${S.plume}.0 || st == ${S.kelp}.0 || st == ${S.iridescent}.0) ? 0.38 : 0.0;
   vec3 luz = uSunColor * (ndl * (0.75 + cau * 1.6) + fino * 0.3) * exp(-prof * vec3(0.12, 0.035, 0.02)) * 0.85
            + mix(uAmbGround, uAmbSky, 0.5 + 0.5 * N.y) * (0.45 + 0.55 * ao);
   vec3 cor = alb * luz * (0.5 + 0.5 * ao);
+  // Fagulhas verde/ouro cintilantes nas colunas de Kelp quando tocadas pela luz e pelas cáusticas
+  if (st == ${S.kelp}.0) {
+    vec3 H = normalize(uLightDir + V);
+    float cellSpeck = h31(floor(P * 36.0));
+    float glint = smoothstep(0.84, 0.995, cellSpeck) * (0.35 + 0.65 * pow(max(dot(N, H), 0.0), 14.0)) * (0.45 + 1.35 * cau);
+    vec3 goldGreen = mix(vec3(0.22, 1.0, 0.52), vec3(1.0, 0.86, 0.28), fract(cellSpeck * 17.3));
+    cor += goldGreen * glint * 1.35 * exp(-prof * 0.04);
+  }
+  // Iridescência Fresnel de filme fino + bioluminescência suave na folhagem roxa/rosa, tapete magenta, leques e anêmonas
+  if (st == ${S.iridescent}.0 || st == ${S.magenta}.0 || st == ${S.anemone}.0 || st == ${S.fan}.0) {
+    float fres = pow(1.0 - abs(dot(N, V)), 2.2);
+    vec3 irid = 0.5 + 0.5 * cos(6.28318 * (fres * 0.75 + t * 0.4 + vec3(0.82, 0.14, 0.56)));
+    float strength = (st == ${S.iridescent}.0 || st == ${S.magenta}.0) ? 0.52 : 0.24;
+    cor = mix(cor, cor * 0.6 + irid * (0.45 + 0.55 * luz), fres * strength);
+    if (st == ${S.iridescent}.0 || st == ${S.magenta}.0) {
+      cor += mix(vec3(0.88, 0.18, 0.72), vec3(0.32, 0.88, 1.0), fres) * (0.14 + 0.22 * part) * smoothstep(0.25, 1.0, t);
+    }
+  }
+  vec4 nv = fogAt(length(cameraPosition - vWorld), -V, vWorld.y);
+  outColor = vec4(finish(mix(cor, nv.rgb, nv.a)), 1.0);
+}
+`;
+
+// ---- Cardumes, Arraias-Manta e Bolhas/Plâncton 100% na GPU (Zero alocações JS por quadro) --------------------------
+const VS_FAUNA_MAR = /* glsl */`
+precision highp float;
+in vec3 position, normal;
+in vec4 aData, iOrbit, iColor; // iOrbit: (cx, cy, cz, radius), iColor: (r, g, b, phaseAndKind)
+uniform mat4 viewMatrix, projectionMatrix;
+uniform vec3 cameraPosition;
+uniform float uTime;
+out vec3 vWorld, vN, vCol;
+out vec4 vData;
+void main() {
+  float raw = iColor.w;
+  float isManta = step(100.0, raw);
+  float phase = raw - isManta * 100.0;
+  float R = abs(iOrbit.w);
+  float dirSign = iOrbit.w >= 0.0 ? 1.0 : -1.0;
+  float speed = isManta > 0.5 ? (0.42 / max(R, 3.0)) : (1.55 / max(R, 1.8));
+  float ang = uTime * speed * dirSign + phase * 6.2831853;
+  // Trajetória suave em 8 / órbita elíptica com oscilação vertical contínua
+  vec2 posXZ = vec2(cos(ang), sin(ang) * (1.0 + 0.18 * cos(ang))) * R;
+  vec2 velXZ = vec2(-sin(ang), cos(ang) * (1.0 + 0.18 * cos(ang)) - sin(ang) * 0.18 * sin(ang)) * dirSign;
+  vec2 fwd = normalize(velXZ + vec2(1e-5, 0.0));
+  vec2 right = vec2(fwd.y, -fwd.x);
+  float scale = isManta > 0.5 ? (1.25 + 0.45 * fract(phase * 7.13)) : (0.72 + 0.38 * fract(phase * 13.7));
+  vec3 p = position * scale;
+  vec3 n = normal;
+  if (isManta > 0.5) {
+    // Bater de asas gracioso das arraias-manta (onda viajante do peito para a ponta das asas)
+    float wx = abs(aData.x);
+    float flap = sin(uTime * 2.35 + phase * 19.0 - wx * 2.2 - aData.y * 1.4) * (0.28 * wx * wx + 0.04 * aData.y) * scale;
+    p.y += flap;
+    n = normalize(vec3(n.x - sign(aData.x) * flap * 0.45, n.y, n.z));
+  } else {
+    // Nado em onda S ao longo da espinha do peixe
+    float bt = aData.x;
+    float sway = sin(uTime * 11.5 + phase * 31.0 - bt * 5.2) * (0.045 * bt * bt) * scale;
+    p.x += sway;
+  }
+  float bob = sin(uTime * (isManta > 0.5 ? 0.9 : 2.1) + phase * 12.0) * (isManta > 0.5 ? 0.45 : 0.22);
+  vec3 worldPos = vec3(
+    iOrbit.x + right.x * p.x + fwd.x * (-p.z) + posXZ.x,
+    min(${(MAR_NIVEL - 0.75).toFixed(2)}, iOrbit.y + p.y + bob),
+    iOrbit.z + right.y * p.x + fwd.y * (-p.z) + posXZ.y
+  );
+  float fade = 1.0 - smoothstep(${(RAIO * 0.78).toFixed(1)}, ${(RAIO * 0.98).toFixed(1)}, length(worldPos - cameraPosition));
+  worldPos = mix(iOrbit.xyz, worldPos, fade);
+  vWorld = worldPos;
+  vN = normalize(vec3(right.x * n.x - fwd.x * n.z, n.y, right.y * n.x - fwd.y * n.z));
+  vCol = iColor.rgb;
+  vData = vec4(aData.xyz, isManta);
+  gl_Position = projectionMatrix * viewMatrix * vec4(worldPos, 1.0);
+}
+`;
+
+const FS_FAUNA_MAR = /* glsl */`
+precision highp float;
+${COMMON}
+uniform vec3 cameraPosition;
+in vec3 vWorld, vN, vCol;
+in vec4 vData;
+out vec4 outColor;
+void main() {
+  vec3 N = normalize(vN); if (!gl_FrontFacing) N = -N;
+  vec3 V = normalize(cameraPosition - vWorld);
+  float prof = max(${MAR_NIVEL.toFixed(2)} - vWorld.y, 0.0);
+  float isManta = vData.w;
+  vec3 alb = vCol;
+  if (isManta > 0.5) {
+    // Dorso azul-ardósia com marcas claras e ventre prateado
+    float belly = 1.0 - vData.z;
+    float spots = smoothstep(0.35, 0.7, cos(vData.x * 9.0) * cos(vData.y * 7.0));
+    alb = mix(alb * (0.65 + 0.45 * spots), vec3(0.86, 0.92, 0.96), belly * 0.85);
+  } else {
+    // Listras tropicais vibrantes e cauda iridescente
+    float stripe = smoothstep(0.15, 0.55, sin(vData.x * 22.0));
+    vec3 accent = vec3(vCol.b, vCol.r * 0.9 + 0.1, vCol.g);
+    alb = mix(alb, accent, stripe * 0.55 + vData.z * 0.35);
+  }
+  float ndl = max(dot(N, uLightDir), 0.0);
+  float fres = pow(1.0 - max(dot(N, V), 0.0), 2.5);
+  vec3 luz = uSunColor * (ndl * 0.9 + 0.25) * exp(-prof * vec3(0.11, 0.032, 0.018))
+           + mix(uAmbGround, uAmbSky, 0.5 + 0.5 * N.y) * 0.75;
+  vec3 cor = alb * luz + vec3(0.28, 0.82, 0.98) * fres * 0.26;
+  vec4 nv = fogAt(length(cameraPosition - vWorld), -V, vWorld.y);
+  outColor = vec4(finish(mix(cor, nv.rgb, nv.a)), 1.0);
+}
+`;
+
+// Partículas submersas toroidais 100% na GPU: bolhas subindo em hélice + partículas douradas/ciano flutuando
+const VS_PARTICULAS_MAR = /* glsl */`
+precision highp float;
+in vec3 position, normal;
+in vec4 iSeed; // (x0, y0, z0, kindAndPhase) kind >= 0.5 = bolha subindo, < 0.5 = plâncton/fagulha flutuando
+uniform mat4 viewMatrix, projectionMatrix;
+uniform vec3 cameraPosition;
+uniform float uTime;
+out vec3 vWorld, vN;
+out vec2 vKind; // (isBubble, seed)
+void main() {
+  float isBubble = step(0.5, iSeed.w);
+  float ph = fract(iSeed.w * 17.31);
+  vec3 box = vec3(34.0, 16.0, 34.0);
+  vec3 drift = isBubble > 0.5
+    ? vec3(sin(uTime * 1.9 + ph * 25.0) * 0.38, uTime * (1.15 + ph * 0.85), cos(uTime * 1.7 + ph * 19.0) * 0.38)
+    : vec3(sin(uTime * 0.45 + ph * 14.0) * 1.1, sin(uTime * 0.6 + ph * 21.0) * 0.45, cos(uTime * 0.4 + ph * 17.0) * 1.1);
+  vec3 rel = mod(iSeed.xyz + drift - cameraPosition + box * 0.5, box) - box * 0.5;
+  vec3 center = cameraPosition + rel;
+  // Só desenha abaixo da superfície do mar e acima do fundo próximo
+  float under = step(center.y, ${(MAR_NIVEL - 0.3).toFixed(2)}) * step(cameraPosition.y, ${(MAR_NIVEL + 6.0).toFixed(2)});
+  float r = isBubble > 0.5 ? (0.026 + 0.034 * ph) : (0.015 + 0.018 * ph);
+  float distFade = 1.0 - smoothstep(11.0, 16.5, length(rel));
+  vec3 w = center + position * (r * under * distFade);
+  vWorld = w; vN = normal; vKind = vec2(isBubble, ph);
+  gl_Position = projectionMatrix * viewMatrix * vec4(w, 1.0);
+}
+`;
+
+const FS_PARTICULAS_MAR = /* glsl */`
+precision highp float;
+${COMMON}
+uniform vec3 cameraPosition;
+in vec3 vWorld, vN;
+in vec2 vKind;
+out vec4 outColor;
+void main() {
+  vec3 N = normalize(vN);
+  vec3 V = normalize(cameraPosition - vWorld);
+  float isBubble = vKind.x, ph = vKind.y;
+  float fres = pow(1.0 - max(dot(N, V), 0.0), 2.0);
+  vec3 H = normalize(uLightDir + V);
+  float spec = pow(max(dot(N, H), 0.0), 24.0);
+  vec3 cor = isBubble > 0.5
+    ? mix(vec3(0.35, 0.82, 0.98), vec3(1.0), fres * 0.65 + spec * 0.9)
+    : mix(vec3(0.28, 1.0, 0.64), vec3(1.0, 0.88, 0.34), ph) * (0.75 + 0.6 * spec);
   vec4 nv = fogAt(length(cameraPosition - vWorld), -V, vWorld.y);
   outColor = vec4(finish(mix(cor, nv.rgb, nv.a)), 1.0);
 }
@@ -258,8 +434,12 @@ export function initRecife({ scene, camera, game }) {
         for (const t in L.types) { r -= L.types[t][zi]; if (r <= 0) { tipo = t; break; } }
         if (!tipo) continue;
         const T = TYPES[tipo];
-        const esc = T.scale[0] + (T.scale[1] - T.scale[0]) * Math.pow(rnd(), 1.6);
+        if (tipo === 'kelp' && prof < 4.2) continue;
+        if (tipo === 'arch' && prof < 5.5) continue;
+        let esc = T.scale[0] + (T.scale[1] - T.scale[0]) * Math.pow(rnd(), 1.6);
         const sy = T.sy[0] + (T.sy[1] - T.sy[0]) * rnd(), sxz = T.sxz[0] + (T.sxz[1] - T.sxz[0]) * rnd();
+        if (tipo === 'kelp') esc = Math.min(esc, Math.max(2.2, (prof - 0.75) / sy));
+        if (tipo === 'arch') esc = Math.min(esc, Math.max(2.6, (prof - 1.1) / (sy * 1.2)));
         // alinhado entre o vertical e a inclinação do fundo
         const hx = gen.height(Math.floor(x) + 1, Math.floor(z)) - gen.height(Math.floor(x) - 1, Math.floor(z));
         const hz = gen.height(Math.floor(x), Math.floor(z) + 1) - gen.height(Math.floor(x), Math.floor(z) - 1);
@@ -271,46 +451,166 @@ export function initRecife({ scene, camera, game }) {
         c.push({ tipo, x, y: topo - T.sink * esc * sy - 0.15, z, esc, sy, sxz, q, c1: c1.map((a) => a * v), c2, seed: rnd(), flex: T.flex ?? (T.s === S.rock || T.s === S.star || T.s === S.brain || T.s === S.brainWide ? -0.06 : 0) });
       }
     }
+    // Set pieces determinísticos (Casco de Galeão Naufragado, Escultura de Cauda de Baleia em Pedra e Arcos Monumentais)
+    // em células costeiras fundas (prof 6.5..18.5 m), sem jamais colidir nem alterar voxels
+    const hSet = hash32(cx, cz, seed ^ 0x9e3779b9);
+    if ((hSet % 19) === 0) {
+      const rndS = rngDe(hSet);
+      const sx = cx * CEL + (0.25 + rndS() * 0.5) * CEL, sz = cz * CEL + (0.25 + rndS() * 0.5) * CEL;
+      const ss = arq.s(sx, sz);
+      if (ss >= 14 && ss <= 145 && arq.p(sx, sz) <= 0) {
+        const topoS = gen.height(Math.floor(sx), Math.floor(sz)) + 1, profS = MAR_NIVEL - topoS;
+        if (profS >= 6.8 && profS <= 18.5) {
+          const piece = (hSet >>> 5) % 3 === 0 ? 'shipHull' : (hSet >>> 5) % 3 === 1 ? 'whaleFluke' : 'arch';
+          const TS = TYPES[piece];
+          const escS = Math.min(TS.scale[0] + (TS.scale[1] - TS.scale[0]) * rndS(), Math.max(3.2, profS - 1.4));
+          const qS = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rndS() * Math.PI * 2);
+          c.push({
+            tipo: piece, x: sx, y: topoS - TS.sink * escS - 0.12, z: sz,
+            esc: escS, sy: 1, sxz: 1, q: qS,
+            c1: srgbLin(TS.c1[0]), c2: srgbLin(TS.c2[0]), seed: rndS(), flex: 0,
+          });
+        }
+      }
+    }
     celulas.set(k, c);
     if (celulas.size > 400) celulas.delete(celulas.keys().next().value);
     return c;
   }
+
+  // ---- Malhas instanciadas de Arraias-Manta, Cardumes de Peixes e Partículas Submersas (Zero GC por frame) ----------
+  const matFauna = new THREE.RawShaderMaterial({ name: 'recife-fauna-mar', glslVersion: THREE.GLSL3, uniforms: { ...U }, vertexShader: VS_FAUNA_MAR, fragmentShader: FS_FAUNA_MAR, side: THREE.DoubleSide });
+  const matPart = new THREE.RawShaderMaterial({ name: 'recife-particulas-mar', glslVersion: THREE.GLSL3, uniforms: { ...U }, vertexShader: VS_PARTICULAS_MAR, fragmentShader: FS_PARTICULAS_MAR });
+
+  function criarLoteFauna(baseGeo, max, name) {
+    const g = new THREE.InstancedBufferGeometry();
+    for (const a of ['position', 'normal', 'aData']) g.setAttribute(a, baseGeo.attributes[a]);
+    g.setIndex(baseGeo.index);
+    g.setAttribute('iOrbit', new THREE.InstancedBufferAttribute(new Float32Array(max * 4), 4));
+    g.setAttribute('iColor', new THREE.InstancedBufferAttribute(new Float32Array(max * 4), 4));
+    g.instanceCount = 0;
+    const m = new THREE.Mesh(g, matFauna); m.frustumCulled = false; m.visible = false; m.name = name;
+    scene.add(m);
+    return { g, m, max, n: 0 };
+  }
+  const loteMantas = criarLoteFauna(Geo.createMantaRay(pc ? 0 : 1), 48, 'recife-arraias-manta');
+  const lotePeixes = criarLoteFauna(Geo.createReefFish(pc ? 0 : 1), 640, 'recife-cardumes');
+
+  // Partículas submersas pré-alocadas 1 única vez (bolhas subindo + plâncton verde/ouro flutuando)
+  const nPart = pc ? 960 : 420;
+  const gPart = new THREE.InstancedBufferGeometry();
+  const sph = new THREE.OctahedronGeometry(1, 1);
+  gPart.setAttribute('position', sph.attributes.position);
+  gPart.setAttribute('normal', sph.attributes.normal);
+  if (sph.index) gPart.setIndex(sph.index);
+  const seedArr = new Float32Array(nPart * 4);
+  const rngP = rngDe(20261124);
+  for (let i = 0; i < nPart; i++) {
+    seedArr[i * 4]     = (rngP() - 0.5) * 34;
+    seedArr[i * 4 + 1] = (rngP() - 0.5) * 16;
+    seedArr[i * 4 + 2] = (rngP() - 0.5) * 34;
+    seedArr[i * 4 + 3] = (i < nPart * 0.34 ? 1.0 : 0.0) + rngP() * 0.49;
+  }
+  gPart.setAttribute('iSeed', new THREE.InstancedBufferAttribute(seedArr, 4));
+  gPart.instanceCount = nPart;
+  const meshPart = new THREE.Mesh(gPart, matPart);
+  meshPart.frustumCulled = false; meshPart.visible = false; meshPart.name = 'recife-particulas-mar';
+  scene.add(meshPart);
+
+  const FISH_PAL = [
+    [0.15, 0.78, 0.95], [1.0, 0.72, 0.14], [0.95, 0.32, 0.68],
+    [0.24, 0.92, 0.58], [0.62, 0.36, 0.98], [1.0, 0.45, 0.22],
+  ];
   let ultimo = null, genUsado = null;
   const tmp = new THREE.Vector3();
   let orcamento = 0, faltou = false;
   function refazer(px, pz) {
     faltou = false;
     for (const l of lotes.values()) l.n = 0;
+    loteMantas.n = 0; lotePeixes.n = 0;
+    const gen = game.gen, arq = gen.arq, seed = gen.seed >>> 0;
     const c0x = Math.floor((px - raio) / CEL), c1x = Math.floor((px + raio) / CEL), c0z = Math.floor((pz - raio) / CEL), c1z = Math.floor((pz + raio) / CEL);
     for (let cz = c0z; cz <= c1z; cz++) for (let cx = c0x; cx <= c1x; cx++) {
       if (!celulas.has(cx + ',' + cz)) { if (orcamento <= 0) { faltou = true; continue; } orcamento--; }
-      for (const o of celula(cx, cz)) {
+      const lista = celula(cx, cz);
+      for (const o of lista) {
         const d = Math.hypot(o.x - px, o.z - pz);
         if (d > raio) continue;
         const nivel = d < PERTO * Math.max(1, o.esc) ? 0 : 2;
         const l = lote(o.tipo, nivel);
         if (l.n >= l.max) continue;
         const k = l.n * 4, T = TYPES[o.tipo];
-        l.g.attributes.iA.array.set([o.x, o.y, o.z, o.esc], k);
-        l.g.attributes.iQ.array.set([o.q.x, o.q.y, o.q.z, o.q.w], k);
-        l.g.attributes.iB.array.set([o.sxz, o.sy, o.sxz, o.flex], k);
-        l.g.attributes.iC1.array.set([o.c1[0], o.c1[1], o.c1[2], o.seed], k);
-        l.g.attributes.iC2.array.set([o.c2[0], o.c2[1], o.c2[2], T.s], k);
+        const oArr = l.g.attributes.iA.array, qArr = l.g.attributes.iQ.array, bArr = l.g.attributes.iB.array, c1Arr = l.g.attributes.iC1.array, c2Arr = l.g.attributes.iC2.array;
+        oArr[k] = o.x; oArr[k + 1] = o.y; oArr[k + 2] = o.z; oArr[k + 3] = o.esc;
+        qArr[k] = o.q.x; qArr[k + 1] = o.q.y; qArr[k + 2] = o.q.z; qArr[k + 3] = o.q.w;
+        bArr[k] = o.sxz; bArr[k + 1] = o.sy; bArr[k + 2] = o.sxz; bArr[k + 3] = o.flex;
+        c1Arr[k] = o.c1[0]; c1Arr[k + 1] = o.c1[1]; c1Arr[k + 2] = o.c1[2]; c1Arr[k + 3] = o.seed;
+        c2Arr[k] = o.c2[0]; c2Arr[k + 1] = o.c2[1]; c2Arr[k + 2] = o.c2[2]; c2Arr[k + 3] = T.s;
         l.n++;
+      }
+      // Cardumes e Arraias-Manta determinísticos por célula de recife com água suficiente
+      if (lista.length > 2) {
+        const hF = hash32(cx, cz, seed ^ 0x517cc1b7);
+        const mx = (cx + 0.5) * CEL, mz = (cz + 0.5) * CEL;
+        if (Math.hypot(mx - px, mz - pz) <= raio) {
+          const topoF = gen.height(Math.floor(mx), Math.floor(mz)) + 1, profF = MAR_NIVEL - topoF;
+          if (profF >= 4.2 && arq.s(mx, mz) >= 8) {
+            const rndF = rngDe(hF);
+            // Arraia-manta planar nas águas médias/fundas
+            if (profF >= 5.5 && (hF % 3) === 0 && loteMantas.n < loteMantas.max) {
+              const mk = loteMantas.n * 4;
+              const oA = loteMantas.g.attributes.iOrbit.array, cA = loteMantas.g.attributes.iColor.array;
+              const mY = topoF + Math.min(profF * 0.58, profF - 1.6);
+              const mR = (4.5 + rndF() * 4.5) * (rndF() < 0.5 ? 1 : -1);
+              oA[mk] = mx; oA[mk + 1] = mY; oA[mk + 2] = mz; oA[mk + 3] = mR;
+              cA[mk] = 0.16; cA[mk + 1] = 0.24; cA[mk + 2] = 0.36; cA[mk + 3] = 100.0 + rndF();
+              loteMantas.n++;
+            }
+            // Cardume coeso (8 a 14 peixes orbitando o recife da célula)
+            if ((hF % 2) === 0 && lotePeixes.n + 14 <= lotePeixes.max) {
+              const pal = FISH_PAL[(hF >>> 4) % FISH_PAL.length];
+              const count = 8 + (hF % 7);
+              const baseY = topoF + 1.2 + rndF() * Math.max(0.8, profF - 2.6);
+              const baseR = (2.2 + rndF() * 2.8) * (rndF() < 0.5 ? 1 : -1);
+              const basePhase = rndF();
+              const oA = lotePeixes.g.attributes.iOrbit.array, cA = lotePeixes.g.attributes.iColor.array;
+              for (let f = 0; f < count; f++) {
+                const fk = lotePeixes.n * 4;
+                oA[fk] = mx + (rndF() - 0.5) * 1.8;
+                oA[fk + 1] = Math.min(MAR_NIVEL - 0.9, Math.max(topoF + 0.7, baseY + (rndF() - 0.5) * 1.1));
+                oA[fk + 2] = mz + (rndF() - 0.5) * 1.8;
+                oA[fk + 3] = baseR + (rndF() - 0.5) * 0.55;
+                cA[fk] = pal[0]; cA[fk + 1] = pal[1]; cA[fk + 2] = pal[2];
+                cA[fk + 3] = (basePhase + f * 0.045 + rndF() * 0.02) % 1;
+                lotePeixes.n++;
+              }
+            }
+          }
+        }
       }
     }
     for (const l of lotes.values()) {
       l.g.instanceCount = l.n; l.m.visible = l.n > 0;
       for (const a of ['iA', 'iQ', 'iB', 'iC1', 'iC2']) l.g.attributes[a].needsUpdate = true;
     }
+    for (const lf of [loteMantas, lotePeixes]) {
+      lf.g.instanceCount = lf.n; lf.m.visible = lf.n > 0;
+      lf.g.attributes.iOrbit.needsUpdate = true;
+      lf.g.attributes.iColor.needsUpdate = true;
+    }
   }
   game.hooks.frame.push(() => {
     const on = !!(game.gen && game.gen.arq && game.dim === 0);
-    if (!on) { for (const l of lotes.values()) l.m.visible = false; return; }
+    if (!on) {
+      for (const l of lotes.values()) l.m.visible = false;
+      loteMantas.m.visible = false; lotePeixes.m.visible = false; meshPart.visible = false;
+      return;
+    }
     camera.getWorldPosition(tmp);
+    meshPart.visible = tmp.y < MAR_NIVEL + 5.5 && (lotePeixes.n > 0 || lotes.size > 0);
     if (genUsado !== game.gen) { genUsado = game.gen; celulas.clear(); ultimo = null; }
     orcamento = 3;                                  // células novas por quadro (geração em parcelas)
     if (!ultimo || faltou || Math.hypot(tmp.x - ultimo[0], tmp.z - ultimo[1]) > 5) { ultimo = [tmp.x, tmp.z]; refazer(tmp.x, tmp.z); }
   });
-  game.recife = { lotes, celulas };
+  game.recife = { lotes, celulas, loteMantas, lotePeixes, meshPart };
 }

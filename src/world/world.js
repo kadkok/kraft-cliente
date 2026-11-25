@@ -17,6 +17,7 @@ import { surfaceShape } from '../../shared/surfaces.js';
 import { isMiniState, MINI_OK, keepState, MOLDE } from '../../shared/minis.js';
 
 import { blocosFerroviarios } from '../../shared/ferrovia-terreno.js';
+import { Crateras, chunksDaCratera, escavarChunk, limparEdicoes } from '../../shared/super-bomba.js';
 
 export function createWorld({ scene, materials, quality }) {
   const group = new THREE.Group();
@@ -25,6 +26,8 @@ export function createWorld({ scene, materials, quality }) {
 
   const chunks = new Map();   // chave -> chunk
   let ferrovia = null;
+  let crateras = new Crateras();
+  const escavacoes = new Map();
   const edits = new Map();    // chave -> Map(índice -> bloco): tudo o que difere do terreno gerado
   let mcPilha = 'realista';   // pilha de pacotes dos blocos do Minecraft (world/mc-malha.js no worker)
   const minis = new Map();    // chave -> Map(índice -> estado mini-bloco)
@@ -73,6 +76,8 @@ export function createWorld({ scene, materials, quality }) {
       c.vox = m.vox;
       c.maxY = m.maxY;
       c.minY = Number.isFinite(m.minY) ? m.minY : fundo;
+      for (const p of crateras.noChunk(c.cx, c.cz)) c.minY = Math.min(c.minY, escavarChunk(c.vox, c.cx, c.cz, p, fundo, c.maxY));
+      escavacoes.delete(c.key);
       const ed = edits.get(c.key);
       if (ed) for (const [i, id] of ed) { c.vox[i + YOFF] = id; const y = i >> 8; if (id && y > c.maxY) c.maxY = y; if (y < c.minY) c.minY = y; }
       aplicarFerrovia(c);
@@ -131,6 +136,7 @@ export function createWorld({ scene, materials, quality }) {
     seed = newSeed >>> 0; dim = newDim; fundo = fundoDe(dim); getBlock.fundo = fundo;
     for (const c of chunks.values()) disposeMeshes(c);
     chunks.clear(); edits.clear(); minis.clear(); ferrovia = null;
+    crateras = new Crateras(); escavacoes.clear();
     urgent.length = soon.length = applyQueue.length = 0;
     stats.chunks = stats.meshed = stats.quads = 0;
     pcx = pcz = 1e9; planDirty = true; lastChunk = null;
@@ -138,12 +144,15 @@ export function createWorld({ scene, materials, quality }) {
     for (const s of workers) s.w.postMessage({ t: 'init', seed, dim, opt, epoch, mcPilha });
   }
 
-  function aplicarFerrovia(c) {
-    const ed = edits.get(c.key);
+  function restaurarBaseDaVia(c, ed) {
     if (c.ferroOrig) {
       for (const [i, v] of c.ferroOrig) if (!ed?.has(i)) c.vox[i + YOFF] = v;
       c.ferroOrig = null;
     }
+  }
+  function aplicarFerrovia(c) {
+    const ed = edits.get(c.key);
+    restaurarBaseDaVia(c, ed);
     const via = blocosFerroviarios(ferrovia, c.cx, c.cz);
     if (!via) return;
     c.ferroOrig = new Map();
@@ -169,6 +178,52 @@ export function createWorld({ scene, materials, quality }) {
       }
     }
     planDirty = true;
+  }
+
+  function registrarCratera(p, detonar = false) {
+    if (!crateras.cabe(p)) return false;
+    if (!crateras.incluir(p) && !detonar) return true;
+    const ativos = [];
+    chunksDaCratera(p, (cx, cz) => {
+      const key = ckey(cx, cz);
+      if (detonar) {
+        const mp = minis.get(key);
+        limparEdicoes(p, cx, cz, edits.get(key), mp, fundo);
+        if (mp?.size === 0) minis.delete(key);
+      }
+      const c = chunks.get(key);
+      if (c?.vox) ativos.push(c);
+    });
+    // A colisão e a malha ao redor de quem joga recebem prioridade.
+    const distancia = c => (c.cx - pcx) ** 2 + (c.cz - pcz) ** 2;
+    ativos.sort((a, b) => distancia(a) - distancia(b));
+    for (const c of ativos) {
+      if (!escavacoes.has(c.key)) escavacoes.set(c.key, []);
+      escavacoes.get(c.key).push(p);
+    }
+    return true;
+  }
+
+  function processarCrateras() {
+    const inicio = performance.now();
+    let n = 0;
+    for (const [key, lista] of escavacoes) {
+      escavacoes.delete(key);
+      const c = chunks.get(key);
+      if (!c?.vox) continue;
+      const ed = edits.get(key);
+      restaurarBaseDaVia(c, ed);
+      for (const p of lista) c.minY = Math.min(c.minY, escavarChunk(c.vox, c.cx, c.cz, p, fundo, c.maxY));
+      if (ed) for (const [i, id] of ed) c.vox[i + YOFF] = id;
+      aplicarFerrovia(c);
+      listeners.chunk?.(c.cx, c.cz);
+      for (let dz = -1; dz <= 1; dz++) for (let dx = -1; dx <= 1; dx++) {
+        const vizinho = chunks.get(ckey(c.cx + dx, c.cz + dz));
+        if (vizinho) vizinho.rev++;
+      }
+      planDirty = true;
+      if (++n >= 4 || performance.now() - inicio >= 2) break;
+    }
   }
 
   function setDistance(r) {
@@ -321,6 +376,7 @@ export function createWorld({ scene, materials, quality }) {
       pcx = cx; pcz = cz; planDirty = true;
       unloadFar();
     }
+    if (escavacoes.size) processarCrateras();
     schedule();
     const uploadStart=performance.now();
     for (let n = 0; n < quality.uploadsPerFrame && applyQueue.length; n++) {
@@ -532,6 +588,8 @@ export function createWorld({ scene, materials, quality }) {
 
   return {
     group, chunks, edits, minis, stats, listeners,
+    registrarCratera, listarCrateras: () => crateras.lista(),
+    blocoComEdicao: (x, y, z) => edits.get(ckey(x >> 4, z >> 4))?.get((x & 15) + ((z & 15) << 4) + (y << 8)) ?? getBlock(x, y, z),
     setMcPilha(p) { mcPilha = p; }, mcPilha: () => mcPilha,
     reset, definirFerrovia, update, setDistance, getBlock, getMini, getLight, getShape, isEdited, setBlock, readRegion, readSurfaceRegion, isLoaded, loadEdits, exportEdits, loadMinis, exportMinis, topSolid,
     requestTextures, progress,

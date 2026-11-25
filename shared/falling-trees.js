@@ -66,7 +66,8 @@ export class FallingTrees {
       if(s.trunk){const y=t.y+1+s.id,b=this.get(t.x,y,t.z);if(b!==(s.id===0?rootId(t):woodId(t))&&!(this.edited(t.x,y,t.z)&&SOLID[b]))continue;}
       ids.push(s.id);
     }
-    return ids;
+    // A escavação pode consumir todos os blocos do tronco ao mesmo tempo.
+    return ids.some(id => graph[id].trunk) ? ids : [];
   }
   create(t,style,ids,leaves,inherit=null,from=null){
     const graph=this.graph(t,style),body=buildTreeBody(graph,ids,leaves,t);if(!body)return null;

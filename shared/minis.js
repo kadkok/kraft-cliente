@@ -26,7 +26,7 @@ export const MINI_OK = new Uint8Array(256);
 for (let id = 1; id < 128; id++) {
   if (SOLID[id] && (KIND[id] === K_CUBE || KIND[id] === K_CUTOUT) && !FUNC[id] && !LEVEL[id]) MINI_OK[id] = 1;
 }
-for (const id of [B.BEDROCK, B.PORTAL, B.ROOT, B.PINE_ROOT, ...LOOSE_IDS, B.MC_SOLIDO, B.MC_RECORTE, B.MC_FORMA]) if (id !== undefined) MINI_OK[id] = 0;   // bloco MC guarda o estado MC no lugar do mini
+for (const id of [B.BEDROCK, B.PORTAL, B.ROOT, B.PINE_ROOT, ...LOOSE_IDS, B.MC_SOLIDO, B.MC_RECORTE, B.MC_FORMA, B.VISAO]) if (id !== undefined) MINI_OK[id] = 0;   // bloco MC guarda o estado MC no lugar do mini
 
 // Terra moldada (Kadmus, 16/11/2026: "use rampas nas ruas e terras, não deixe blocos quadrados sem acabamento").
 // Edição comum fica cubo (a forma de terreno não arredonda construção de ninguém). Uma obra de paisagem — estrada,
@@ -47,8 +47,15 @@ for (const id of [B.LOG, B.PINE_LOG, B.ROOT, B.PINE_ROOT]) if (id !== undefined)
 export const isMcState = (s) => Number.isInteger(s) && s >= MC_BASE && s < MC_BASE + MC_N;
 export const mcIdDoEstado = (s) => { if (!isMcState(s)) return -1; const c = MC_CLASSE[s - MC_BASE]; return c === 0 ? B.MC_SOLIDO : c === 1 ? B.MC_RECORTE : c === 2 ? B.MC_FORMA : -1; };
 export const IS_MC = (id) => id === B.MC_SOLIDO || id === B.MC_RECORTE || id === B.MC_FORMA;
+// Visão unilateral (Kadmus, 23/11/2026): célula B.VISAO com estado VISAO_BASE + bloco·8 + face. A malha desenha só a face
+// de fora (0..5 = +X -X +Y -Y +Z -Z) com a textura do bloco escolhido, de um lado só: de dentro não há face, vê-se tudo.
+export const VISAO_BASE = 0xC000;
+export const isVisaoState = (s) => Number.isInteger(s) && s >= VISAO_BASE && s < VISAO_BASE + 128 * 8 && ((s - VISAO_BASE) & 7) < 6;
+export const visaoState = (bloco, face) => VISAO_BASE + (bloco & 127) * 8 + (face & 7);
+export const visaoBloco = (s) => (s - VISAO_BASE) >> 3;
+export const visaoFace = (s) => (s - VISAO_BASE) & 7;
 // o estado que um espaço guarda com este bloco: mini-bloco válido, terra moldada válida, tronco quadrado, estado MC da classe certa ou nada
-export const keepState = (s, id) => (isMiniState(s) && MINI_OK[id]) || (isMolde(s) && MOLDE_OK[id]) || (isTroncoQuadrado(s) && TRONCO_OK[id]) || (isMcState(s) && mcIdDoEstado(s) === id) ? s : 0;
+export const keepState = (s, id) => (isMiniState(s) && MINI_OK[id]) || (isMolde(s) && MOLDE_OK[id]) || (isTroncoQuadrado(s) && TRONCO_OK[id]) || (isMcState(s) && mcIdDoEstado(s) === id) || (isVisaoState(s) && id === B.VISAO) ? s : 0;
 
 // eixo a partir da normal da face clicada: no chão ou no teto fica em pé; numa lateral, deita apontando para fora
 export function axisFromNormal(nx, ny, nz) {

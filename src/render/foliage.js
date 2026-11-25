@@ -12,49 +12,85 @@ const NORMALS = [[1,0,0],[-1,0,0],[0,1,0],[0,-1,0],[0,0,1],[0,0,-1]];
 const random = (x,y,z,k) => hash3(x + k * 31,y,z) / 4294967296;
 
 export function foliageBuffers(pos, dat, count, cx = 0, cz = 0, planes = 3) {
+  let hasLeaf = false;
+  for (let i = 3, lim = count * 4; i < lim; i += 16) {
+    if (pos[i] >= TINT_D0) { hasLeaf = true; break; }
+  }
+  if (!hasLeaf) return null;
   const cells = new Map(), keep = [];
   for (let q = 0; q < count; q += 4) {
     const layer = pos[q * 4 + 3];
     if (layer < TINT_D0) { keep.push(q); continue; }
     const dir = dat[q * 4] & 7;
     if (dir > 5) { keep.push(q); continue; }
-    const min=[Infinity,Infinity,Infinity],max=[-Infinity,-Infinity,-Infinity];
-    for(let i=0;i<4;i++)for(let a=0;a<3;a++){const v=pos[(q+i)*4+a];min[a]=Math.min(min[a],v);max[a]=Math.max(max[a],v);}
+    let min0 = Infinity, min1 = Infinity, min2 = Infinity, max0 = -Infinity, max1 = -Infinity, max2 = -Infinity;
+    for (let i = 0; i < 4; i++) {
+      const base = (q + i) * 4, v0 = pos[base], v1 = pos[base + 1], v2 = pos[base + 2];
+      if (v0 < min0) min0 = v0; if (v0 > max0) max0 = v0;
+      if (v1 < min1) min1 = v1; if (v1 > max1) max1 = v1;
+      if (v2 < min2) min2 = v2; if (v2 > max2) max2 = v2;
+    }
     // Faces greedy podem cobrir várias células: reconstituir toda a superfície.
-    const axis=dir>>1,from=min.map(v=>Math.floor(v+1e-5)),to=max.map(v=>Math.ceil(v-1e-5)-1);
-    from[axis]=to[axis]=Math.floor(min[axis]-NORMALS[dir][axis]*.5);
-    for(let x=from[0];x<=to[0];x++)for(let y=from[1];y<=to[1];y++)for(let z=from[2];z<=to[2];z++) {
-      const p=[x,y,z],key=p.join(','),light=dat[q*4+1];
-      if(!cells.has(key))cells.set(key,{p,layer,light,cl:[dat[q*4+2],dat[q*4+3]]});
-      else {const old=cells.get(key).light;cells.get(key).light=Math.max(old&15,light&15)|(Math.max(old>>4,light>>4)<<4);}
+    const axis = dir >> 1;
+    let fx = Math.floor(min0 + 1e-5), fy = Math.floor(min1 + 1e-5), fz = Math.floor(min2 + 1e-5);
+    let tx = Math.ceil(max0 - 1e-5) - 1, ty = Math.ceil(max1 - 1e-5) - 1, tz = Math.ceil(max2 - 1e-5) - 1;
+    if (axis === 0) fx = tx = Math.floor(min0 - NORMALS[dir][0] * .5);
+    else if (axis === 1) fy = ty = Math.floor(min1 - NORMALS[dir][1] * .5);
+    else fz = tz = Math.floor(min2 - NORMALS[dir][2] * .5);
+    const light = dat[q * 4 + 1], cl0 = dat[q * 4 + 2], cl1 = dat[q * 4 + 3];
+    for (let x = fx; x <= tx; x++) for (let y = fy; y <= ty; y++) for (let z = fz; z <= tz; z++) {
+      const key = ((x + 64) & 255) | (((z + 64) & 255) << 8) | (((y + 128) & 1023) << 16);
+      const cur = cells.get(key);
+      if (!cur) cells.set(key, { x, y, z, layer, light, cl0, cl1 });
+      else { const old = cur.light; cur.light = Math.max(old & 15, light & 15) | (Math.max(old >> 4, light >> 4) << 4); }
     }
   }
   if (!cells.size) return null;
-  planes=planes===6?6:3;
-  const quads=keep.length+cells.size*planes,n=quads*4;
-  const p=new Float32Array(n*4),d=new Uint8Array(n*4),c=new Float32Array(n*3),idx=new Uint32Array(quads*6);
-  let at=0;
-  for(const q of keep) {p.set(pos.subarray(q*4,q*4+16),at*4);d.set(dat.subarray(q*4,q*4+16),at*4);at+=4;}
-  for(const cell of cells.values()) {
-    const [x,y,z]=cell.p,wx=x+cx,wz=z+cz;
-    const center=leafCenter(wx,y,wz);center[0]-=cx;center[2]-=cz;
-    const angle=random(wx,y,wz,4)*Math.PI;
-    for(let plane=0;plane<planes;plane++) {
-      const a=angle+plane*2.39996,tilt=(plane%3===2?1.15:.50)*(random(wx,y,wz,6+plane)*2-1);
-      const span=(planes===6?1.12:1.42)+random(wx,y,wz,15+plane)*.20;
-      const branch=center.map((v,axis)=>v+(random(wx,y,wz,30+plane*3+axis)-.5)*.58);
-      const r=[Math.cos(a),0,Math.sin(a)],u0=[-Math.sin(a)*Math.sin(tilt),Math.cos(tilt),Math.cos(a)*Math.sin(tilt)];
-      const roll=random(wx,y,wz,50+plane)*Math.PI*2,co=Math.cos(roll),si=Math.sin(roll);
-      const right=r.map((v,i)=>v*co+u0[i]*si),up=u0.map((v,i)=>v*co-r[i]*si);
-      for(const [u,v] of [[0,0],[1,0],[1,1],[0,1]]) {
-        for(let axis=0;axis<3;axis++) {p[at*4+axis]=branch[axis]+((u-.5)*right[axis]+(v-.5)*up[axis])*span;c[at*3+axis]=center[axis];}
-        p[at*4+3]=cell.layer;
-        d.set([6|24|(u<<6)|(v<<7),cell.light,...cell.cl],at*4);at++;
+  planes = planes === 6 ? 6 : 3;
+  const quads = keep.length + cells.size * planes, n = quads * 4;
+  const p = new Float32Array(n * 4), d = new Uint8Array(n * 4), c = new Float32Array(n * 3), idx = new Uint32Array(quads * 6);
+  let at = 0;
+  for (let i = 0; i < keep.length; i++) {
+    const q = keep[i];
+    p.set(pos.subarray(q * 4, q * 4 + 16), at * 4);
+    d.set(dat.subarray(q * 4, q * 4 + 16), at * 4);
+    at += 4;
+  }
+  for (const cell of cells.values()) {
+    const { x, y, z, layer: cLayer, light: cLight, cl0, cl1 } = cell, wx = x + cx, wz = z + cz;
+    const center = leafCenter(wx, y, wz);
+    const cx0 = center[0] - cx, cy0 = center[1], cz0 = center[2] - cz;
+    const angle = random(wx, y, wz, 4) * Math.PI;
+    for (let plane = 0; plane < planes; plane++) {
+      const a = angle + plane * 2.39996, tilt = (plane % 3 === 2 ? 1.15 : .50) * (random(wx, y, wz, 6 + plane) * 2 - 1);
+      const span = (planes === 6 ? 1.12 : 1.42) + random(wx, y, wz, 15 + plane) * .20;
+      const bx0 = cx0 + (random(wx, y, wz, 30 + plane * 3) - .5) * .58;
+      const bx1 = cy0 + (random(wx, y, wz, 30 + plane * 3 + 1) - .5) * .58;
+      const bx2 = cz0 + (random(wx, y, wz, 30 + plane * 3 + 2) - .5) * .58;
+      const ca = Math.cos(a), sa = Math.sin(a), ct = Math.cos(tilt), st = Math.sin(tilt);
+      const r0 = ca, r2 = sa, u00 = -sa * st, u01 = ct, u02 = ca * st;
+      const roll = random(wx, y, wz, 50 + plane) * Math.PI * 2, co = Math.cos(roll), si = Math.sin(roll);
+      const right0 = r0 * co + u00 * si, right1 = u01 * si, right2 = r2 * co + u02 * si;
+      const up0 = u00 * co - r0 * si, up1 = u01 * co, up2 = u02 * co - r2 * si;
+      for (let vi = 0; vi < 4; vi++) {
+        const u = (vi === 1 || vi === 2) ? 1 : 0, v = vi >= 2 ? 1 : 0;
+        const du = u - .5, dv = v - .5, p4 = at * 4, p3 = at * 3;
+        p[p4] = bx0 + (du * right0 + dv * up0) * span;
+        p[p4 + 1] = bx1 + (du * right1 + dv * up1) * span;
+        p[p4 + 2] = bx2 + (du * right2 + dv * up2) * span;
+        p[p4 + 3] = cLayer;
+        c[p3] = cx0; c[p3 + 1] = cy0; c[p3 + 2] = cz0;
+        d[p4] = 6 | 24 | (u << 6) | (v << 7); d[p4 + 1] = cLight; d[p4 + 2] = cl0; d[p4 + 3] = cl1;
+        at++;
       }
     }
   }
-  for(let q=0;q<quads;q++){const b=q*4;idx.set([b,b+1,b+2,b,b+2,b+3],q*6);}
-  return {pos:p,dat:d,crown:c,index:idx,cells:cells.size,removed:count/4-keep.length,quads};
+  for (let q = 0; q < quads; q++) {
+    const b = q * 4, o = q * 6;
+    idx[o] = b; idx[o + 1] = b + 1; idx[o + 2] = b + 2;
+    idx[o + 3] = b; idx[o + 4] = b + 2; idx[o + 5] = b + 3;
+  }
+  return { pos: p, dat: d, crown: c, index: idx, cells: cells.size, removed: count / 4 - keep.length, quads };
 }
 
 export function crownShader(source) {
@@ -220,8 +256,15 @@ function emitCactus(emit, cell, x, z, y0, yTop, sideLayer, topLayer) {
 }
 
 export function trunkBuffers(pos,dat,count,skip=null,keepCell=null,neighbor=null,fino=false) {
-  const ids=[TEX_INDEX.log_side,TEX_INDEX.log_top,TEX_INDEX.pine_side,TEX_INDEX.pine_top];
+  const l0=TEX_INDEX.log_side,l1=TEX_INDEX.log_top,p0=TEX_INDEX.pine_side,p1=TEX_INDEX.pine_top;
   const cactusSide=TEX_INDEX.cactus_side,cactusTop=TEX_INDEX.cactus_top;
+  let hasTrunk=false;
+  for(let i=3,lim=count*4;i<lim;i+=16){
+    const layer=pos[i];
+    if(layer===l0||layer===l1||layer===p0||layer===p1||layer===cactusSide||layer===cactusTop){hasTrunk=true;break;}
+  }
+  if(!hasTrunk)return null;
+  const ids=[l0,l1,p0,p1];
   const cells=new Map(),cacti=new Map(),keep=[];
   for(let q=0;q<count;q+=4){
     const layer=pos[q*4+3],dir=dat[q*4]&7;
@@ -313,8 +356,15 @@ export function installFoliage(world,context={}) {
     mesh.geometry=next;mesh.material=m;if(depth)mesh.customDepthMaterial=depth;if(g.index?.count===16384*6)g.index=null;g.dispose();
     const delta=out.quads-count/4;chunk.quads+=delta;world.stats.quads+=delta;stats.trunks+=out.cells;
   }
-  function applyCanopy(chunk) {
-    applyTrunks(chunk);
+  function hasCanopyQuads(g) {
+    if(!g||g.userData.organicCanopy)return false;
+    const p=g.attributes.aPos,d=g.attributes.aDat;if(!p||!d)return false;
+    const count=Math.min(p.count,Number.isFinite(g.drawRange.count)?g.drawRange.count/6*4:p.count);
+    const arr=p.array;
+    for(let i=3,lim=count*4;i<lim;i+=16)if(arr[i]>=TINT_D0)return true;
+    return false;
+  }
+  function applyCanopyOnly(chunk) {
     const mesh=chunk.meshes?.[1],g=mesh?.geometry;
     if(!g||g.userData.organicCanopy)return;
     const m=material(mesh.material),depth=mesh.customDepthMaterial?material(mesh.customDepthMaterial):null;
@@ -334,8 +384,11 @@ export function installFoliage(world,context={}) {
     stats.chunks++;stats.cells+=out.cells;stats.removedFaces+=out.removed;stats.maxBuildMs=Math.max(stats.maxBuildMs,performance.now()-start);
   }
   function apply(chunk) {
-    const refresh=chunk.meshes?.[1]?.userData.lavraGlassRefresh;
-    return refresh?refresh(()=>applyCanopy(chunk)):applyCanopy(chunk);
+    applyTrunks(chunk);
+    const mesh=chunk.meshes?.[1];
+    if(!hasCanopyQuads(mesh?.geometry))return;
+    const refresh=mesh?.userData.lavraGlassRefresh;
+    return refresh?refresh(()=>applyCanopyOnly(chunk)):applyCanopyOnly(chunk);
   }
   const onModels=(chunk,models)=>{previous?.(chunk,models);apply(chunk);};world.listeners.models=onModels;
   return {stats,update(){for(const [source,copy] of clones)if(versions.get(source)!==source.version){copy.defines=source.defines;copy.needsUpdate=true;versions.set(source,source.version);}for(let i=0;i<2&&queue.length;i++){const c=queue.shift();if(world.chunks.get(c.key)===c)apply(c);}},

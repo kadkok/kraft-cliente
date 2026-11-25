@@ -14,8 +14,9 @@ const COR = { torre: [0.24, 0.3, 0.38], escritorio: [0.3, 0.3, 0.32], reboco: [0
 
 export function initCidadeLonge({ game, scene, camera, world }) {
   let genRef = null, malha = null, lista = [], cid = null;
+  let lastCamX = 1e9, lastCamY = 1e9, lastCamZ = 1e9;
   const M = new THREE.Matrix4(), P = new THREE.Vector3(), S = new THREE.Vector3(), Q = new THREE.Quaternion(), cam = new THREE.Vector3(), cor = new THREE.Color();
-  function desmonta() { if (malha) { scene.remove(malha); malha.geometry.dispose(); malha.material.dispose(); malha = null; } lista = []; cid = null; }
+  function desmonta() { if (malha) { scene.remove(malha); malha.geometry.dispose(); malha.material.dispose(); malha = null; } lista = []; cid = null; lastCamX = lastCamY = lastCamZ = 1e9; }
   function monta(gen) {
     desmonta();
     const il = (game.dim || 0) === 0 ? gen?.arq?.ilhas?.find((i) => i.tema === 5) : null;
@@ -26,7 +27,7 @@ export function initCidadeLonge({ game, scene, camera, world }) {
       const alt = p.tipo === 'estadio' ? 15 : Math.min(70, (p.altura || CHAO + 4) - CHAO);
       if (alt < 3) continue;
       const v = 0.86 + 0.28 * (Math.abs(Math.sin(p.id * 12.9898) * 43758.5453) % 1);
-      lista.push({ x: (p.x0 + p.x1 + 1) / 2, z: (p.z0 + p.z1 + 1) / 2, w: p.x1 - p.x0 + 0.4, d: p.z1 - p.z0 + 0.4, h: alt, c: (COR[p.tipo] || COR.reboco).map((k) => k * v), k: ckey(Math.floor((p.x0 + p.x1) / 32), Math.floor((p.z0 + p.z1) / 32)) });
+      lista.push({ x: (p.x0 + p.x1 + 1) / 2, z: (p.z0 + p.z1 + 1) / 2, w: p.x1 - p.x0 + 0.4, d: p.z1 - p.z0 + 0.4, h: alt, c: (COR[p.tipo] || COR.reboco).map((k) => k * v), k: ckey(Math.floor((p.x0 + p.x1) / 32), Math.floor((p.z0 + p.z1) / 32)), escondido: null });
     }
     const g = new THREE.BoxGeometry(1, 1, 1); g.translate(0, 0.5, 0);
     malha = new THREE.InstancedMesh(g, new THREE.MeshStandardMaterial({ roughness: 0.85, emissive: new THREE.Color('#ffd9a0'), emissiveIntensity: 0 }), lista.length);
@@ -46,17 +47,32 @@ export function initCidadeLonge({ game, scene, camera, world }) {
     relogio = 0.25;
     const dia = Math.min(1, Math.max(0, ((U.uSunDir?.value?.y ?? 1) + 0.08) / 0.3));
     malha.material.emissiveIntensity = (1 - dia) * 0.05;
+    const dxCam = cam.x - lastCamX, dyCam = cam.y - lastCamY, dzCam = cam.z - lastCamZ;
+    const updateFog = dxCam * dxCam + dyCam * dyCam + dzCam * dzCam > 16;
+    if (updateFog) { lastCamX = cam.x; lastCamY = cam.y; lastCamZ = cam.z; }
+    let matChanged = false, colChanged = false;
     for (let i = 0; i < lista.length; i++) {
-      const p = lista[i];
-      if (world.chunks.get(p.k)?.hasMesh) { S.set(0, 0, 0); P.set(p.x, -50, p.z); M.compose(P, Q, S); malha.setMatrixAt(i, M); continue; }   // o prédio de verdade já está lá
-      const d = Math.hypot(p.x - cam.x, CHAO - cam.y, p.z - cam.z);
-      P.set(p.x, CHAO, p.z); S.set(p.w, p.h, p.d);
-      M.compose(P, Q, S); malha.setMatrixAt(i, M);
-      // bruma: quanto mais longe, mais perto da cor do ar
-      const br = 1 - Math.exp(-d * 0.00075);
-      cor.setRGB(p.c[0] + (0.4 - p.c[0]) * br, p.c[1] + (0.47 - p.c[1]) * br, p.c[2] + (0.56 - p.c[2]) * br); malha.setColorAt(i, cor);
+      const p = lista[i], esc = Boolean(world.chunks.get(p.k)?.hasMesh);
+      if (esc !== p.escondido) {
+        p.escondido = esc;
+        if (esc) { S.set(0, 0, 0); P.set(p.x, -50, p.z); }
+        else { P.set(p.x, CHAO, p.z); S.set(p.w, p.h, p.d); }
+        M.compose(P, Q, S); malha.setMatrixAt(i, M); matChanged = true;
+        if (!esc && !updateFog) {
+          const d = Math.hypot(p.x - cam.x, CHAO - cam.y, p.z - cam.z), br = 1 - Math.exp(-d * 0.00075);
+          cor.setRGB(p.c[0] + (0.4 - p.c[0]) * br, p.c[1] + (0.47 - p.c[1]) * br, p.c[2] + (0.56 - p.c[2]) * br);
+          malha.setColorAt(i, cor); colChanged = true;
+        }
+      }
+      if (!esc && updateFog) {
+        // bruma: quanto mais longe, mais perto da cor do ar
+        const d = Math.hypot(p.x - cam.x, CHAO - cam.y, p.z - cam.z), br = 1 - Math.exp(-d * 0.00075);
+        cor.setRGB(p.c[0] + (0.4 - p.c[0]) * br, p.c[1] + (0.47 - p.c[1]) * br, p.c[2] + (0.56 - p.c[2]) * br);
+        malha.setColorAt(i, cor); colChanged = true;
+      }
     }
-    malha.instanceMatrix.needsUpdate = true; if (malha.instanceColor) malha.instanceColor.needsUpdate = true;
+    if (matChanged) malha.instanceMatrix.needsUpdate = true;
+    if (colChanged && malha.instanceColor) malha.instanceColor.needsUpdate = true;
   });
   return { get n() { return lista.length; } };
 }

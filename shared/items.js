@@ -21,6 +21,7 @@ import { MC_BASE, MC_BLOCOS, MC_POR_NOME, mcBloco } from './mc-estados.js';
 import { mcNomePt } from './mc-nomes.js';
 import { boxSolid } from './surfaces.js';
 import { isTesouro, nomeDe } from './tesouros.js';   // tesouros, gemas e armas lendárias (shared/tesouros.js)
+import { isObj, objDe } from './objetos.js';
 
 export const ITEM_HALF = 0.125;     // meio lado do cubinho (m)
 export const STACK = 64;            // iguais por espaço da mochila e por pilha no chão
@@ -46,9 +47,11 @@ const DROP_AS = new Map([
 const MC_DROP_AS = { grass_block: 'dirt', podzol: 'dirt', mycelium: 'dirt', dirt_path: 'dirt', farmland: 'dirt', stone: 'cobblestone' };
 const MC_NO_DROP = /(_leaves|^short_grass|^tall_grass|^fern|^large_fern|^dead_bush|^seagrass|^tall_seagrass|^fire|^soul_fire|^air|^cave_air|^void_air|^water|^lava|^bubble_column|^light)$/;
 
-// Um item válido: bloco existente que não é ar nem líquido; bloco do Minecraft só com um estado da sua classe.
+// Um item válido: bloco existente que não é ar nem líquido; bloco do Minecraft só com um estado da sua classe; ou um
+// objeto (shared/objetos.js: b = 0 e s = o número dele — carne, couro, corda, sela… não se põem no mundo como bloco).
 export function validItem(b, s) {
   if (isTesouro(b)) return s === 0;   // tesouro: não é bloco, não tem estado
+  if (b === 0) return isObj(b, s);
   if (!isValidBlock(b) || b === B.AIR || b === B.BEDROCK || b === B.PORTAL || KIND[b] === K_LIQUID || LEVEL[b] > 0) return false;
   if (IS_MC(b)) return isMcState(s) && mcIdDoEstado(s) === b;
   return s === 0;
@@ -92,6 +95,7 @@ export function placeItem(id, s = 0) {
 
 export function itemName(b, s = 0) {
   if (isTesouro(b)) return nomeDe(b);
+  if (b === 0) return objDe(b, s)?.nome || 'Item';
   if (isMcState(s)) return mcNomePt(MC_BLOCOS[mcBloco(s - MC_BASE)].n);
   return BLOCKS[b]?.name || 'Item';
 }

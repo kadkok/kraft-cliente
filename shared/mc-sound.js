@@ -1,6 +1,6 @@
 // LAVRA — mapeamento acústico de materiais para todos os blocos (nativos e Minecraft 1.21.8).
 // Puro: compartilhado entre cliente e testes.
-import { MC_BASE, mcEstado } from './mc-estados.js';
+import { MC_BASE, mcEstado, MC_N } from './mc-estados.js';
 
 const RULES = [
   [/(water|kelp|seagrass|bubble_column)/, 'water'],
@@ -28,7 +28,7 @@ export function mcSoundOf(name) {
 }
 
 export function soundOfBlock(BLOCKS, id, miniState = 0) {
-  if (miniState >= MC_BASE) {
+  if (miniState >= MC_BASE && miniState < MC_BASE + MC_N) {   // só estado MC (a visão unilateral mora acima)
     try {
       const st = mcEstado(miniState - MC_BASE);
       if (st?.nome) return mcSoundOf(st.nome);

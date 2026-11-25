@@ -411,7 +411,8 @@ export function nascer(egua, seed, paiTemper = null) {
 export function atributos(c) { return [c.sexo === 'M' ? 1 : 0, Math.round(crescimento(c) * 100), c.pelagem, c.prenhe ? 1 : 0, Math.round(c.domado * 100), c.montadoPor ? 1 : 0]; }
 
 const GUARDA = ['id', 'sexo', 'idade', 'nome', 'pelagem', 'ousadia', 'docilidade', 'curiosidade', 'sociavel', 'fome', 'sede', 'bexiga', 'intestino',
-  'sono', 'rem', 'fadiga', 'saude', 'cio', 'prenhe', 'lactacao', 'mae', 'pai', 'vidaMax', 'confianca', 'costume', 'domado', 'morto'];
+  'sono', 'rem', 'fadiga', 'saude', 'cio', 'prenhe', 'lactacao', 'mae', 'pai', 'vidaMax', 'confianca', 'costume', 'domado', 'morto',
+  'dono', 'sela', 'ordem', 'posto', 'treino'];   // convívio (19/11): de quem é, se está selado, a ordem que cumpre e o que já aprendeu
 const r3 = (v) => (typeof v === 'number' ? Math.round(v * 1000) / 1000 : v);
 export function guardar(c) { const o = {}; for (const k of GUARDA) o[k] = typeof c[k] === 'object' && c[k] !== null ? JSON.parse(JSON.stringify(c[k])) : r3(c[k]); return o; }
 export function carregar(o) {

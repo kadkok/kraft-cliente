@@ -1,3 +1,5 @@
+import { initEstudioSkins } from './game/estudio-skins.js';
+import { fumacaSkin } from './render/estudio-skins.js';
 // LAVRA — ponto de entrada: monta os sistemas, guarda a máquina de estados e roda o único
 // laço do jogo (passo fixo de 60 Hz para a física, desenho interpolado).
 
@@ -75,6 +77,10 @@ import { initBola } from './game/bola.js';
 import { initTelaCheia } from './game/tela-cheia.js';
 import { initPovos } from './game/povos.js';
 import { initCidadeLonge } from './game/cidade-longe.js';   // perfil da Ilha Metrópole visto de longe (caixas até o mundo carregar)
+import { initTrator } from './game/trator.js';             // trator de terraplenagem: /trator (24/11)
+import { initPerfurador } from './game/perfurador.js';     // perfurador de túneis: /perfurar (24/11)
+import { bolsaoSeco } from '../shared/perfurador.js';
+import { initTransito } from './game/transito.js';         // carros, viaturas, ambulância, bombeiros e aviões da Metrópole (24/11)
 import { initVulcao } from './game/vulcao.js';   // penacho de fumaça e clarão da cratera da Ilha do Vulcão
 import { initIlhasProps } from './game/ilhas-props.js';   // modelos 3D (.glb Meshy) das ilhas, cais e bóias de canal
 import { mapaSolo, sementeArquipelago } from '../shared/mapa-solo.js';
@@ -195,7 +201,7 @@ function surfaceMaterialAt(bx, by, bz, py, underId, inWater = false) {
   return classifyCoastalStepMaterial(rawMat, { inWater: false, nearWater, nearSeaLevel, rain: game.weather?.rain || 0 });
 }
 
-const avatars = createAvatars(scene, lightProbe);
+const avatars = createAvatars(scene, lightProbe, () => game.slug);
 // passos dos outros jogadores: só de quem pisa em chão firme, ouvidos do lugar onde estão
 avatars.onStep = (x, y, z) => {
   const bx = Math.floor(x), by = Math.floor(y - 0.2), bz = Math.floor(z);
@@ -233,6 +239,7 @@ const net = createNet({
     game.partidaLocal = false;
     game.slug = m.world; game.color = m.color;
     if (fresh) startWorld(m.seed, m.dim || 0, m.gen || null);
+    for (const p of m.superCrateras || []) world.registrarCratera(p);
     world.loadEdits(m.edits || {});
     world.loadMinis(m.minis || {});
     avatars.clear(); game.players.clear();
@@ -242,6 +249,7 @@ const net = createNet({
   },
   spawned(name) {
     game.name = name;
+    estudioSkins.onSpawn();
     game.garagem?.restaurarNaRede(name);
     store.set('nome', name);
     if (game.state === 'MENU') {
@@ -292,6 +300,7 @@ const net = createNet({
     }
     if (terreno === 'ilhas') startWorld(sementeArquipelago, 0, { mapa: mapaSolo, fortaleza: posicaoFortalezaSolo(store,slug) });
     else startWorld(seedFromString('lavra:' + slug));
+    for (const p of store.get('off.crateras.' + slug, []) || []) world.registrarCratera(p);
     world.loadEdits(store.get('off.' + slug, {}));
     world.loadMinis(store.get('off.minis.' + slug, {}));
     net.startLocalClock(store.get('relogio.' + slug, null));   // sem servidor, o relógio do mundo é o deste aparelho
@@ -472,7 +481,8 @@ const touch = device.touch ? attachTouch(input, canvas, ui.el.touch, {
 game.xr = createXR({ renderer, scene, rig, pivot, camera, input, player, game, ui, interaction, icons: () => icons, settings });
 initVrDesempenho({ game, renderer, world, quality, atmosphere });
 game.afterXR = () => { if (game.state === 'PLAYING') transition('PAUSED'); onResize(); };
-const machines = initMachines({ game, world, player, net, ui, input, scene, interaction, effects, store });
+const machines = initMachines({ game, world, player, net, ui, input, scene, interaction, effects, store,
+  salvarCrateraSolo() { offlineDirty = true; salvarSolo(); } });
 game.machines = machines;
 const entities = initEntities({ game, world, player, net, ui, input, scene, interaction, effects, lightProbe, respawn });
 const fx = initFx({ game, scene, camera, ui, world });
@@ -536,9 +546,12 @@ initPovos({ game, scene, camera, net });
 initBalsa({ game, scene, camera, net, player, ui, avatars });
 initFerrovia({ game, world, player, net, ui, input, scene });
 game.garagem = initGaragem({game,player,world,net,ui,scene,avatars,store,input,openOverlay,closeOverlay});
+game.trator = initTrator({ game, player, world, net, ui, scene, input });
+game.perfurador = initPerfurador({ game, player, net, ui, scene, input });
 initVulcao({ game, scene, camera });
 initIlhasProps({ game, scene, camera });
 initCidadeLonge({ game, scene, camera, world });
+initTransito({ game, scene, camera, world });
 initMapa({ game, world, player, avatars, net, openOverlay, closeOverlay, device });
 game.painelGM = initGm({ game, net, ui, mapa: game.mapa, openOverlay, closeOverlay, pausar: () => transition('PAUSED'), touch: device.touch });
 const hudNautico = initHudNautico({ game, world, player, avatars, getWind: () => U.uWind.value, getSeaInfo: () => place });
@@ -547,6 +560,7 @@ initCosta({ game, world, player, net, ui, input, scene, camera, avatars });
 // itens soltos e mochila: quebrou, o bloco cai como item; passou perto (ou tecla P), entra na mochila (game/items.js)
 const items = initItems({ game, world, player, net, ui, input, scene, store, lightProbe, avatars, openOverlay });
 initBaus({ game, net, ui, input, interaction, openOverlay, closeOverlay });   // F no baú abre (game/baus.js)
+const estudioSkins = initEstudioSkins({ game, net, ui, self, avatars });
 initCliente({ game, net, ui, device, settings, quality, params });   // service worker, botão de instalar e a seção "Este aparelho" da pausa
 // fabricação (2x2 na mochila, 3x3 na mesa de trabalho, fornalha e portas/alçapões/barris)
 const crafting = initCrafting({ game, world, net, ui, input, interaction, openOverlay, closeOverlay });
@@ -554,7 +568,8 @@ initMenuVr({ game, net, ui, player, interaction, camera, scene, store, settings,
 initToqueExtra({ game, ui, input, interaction, device });
 initDesfazer({ game, world, interaction, player, ui, device });
 // movimentos dos blocos do Minecraft: fumaça, chamas, folhas caindo, gotas, esporos, portal… (lógica em world/, desenho em render/)
-initMovimentosMc({ game, world, camera, quality, particulas: criarParticulasMc(scene, quality), noite: () => U.uNight.value });
+const particulasMc = criarParticulasMc(scene, quality);
+initMovimentosMc({ game, world, camera, quality, particulas: particulasMc, noite: () => U.uNight.value });
 
 // Troca de plano: nano mergulha no bloco mirado; macro sobe a escala; normal volta.
 function changePlane(k) {
@@ -608,7 +623,7 @@ document.addEventListener('pointerlockchange', () => {
 });
 canvas.addEventListener('click', () => { if (game.state === 'PLAYING' && !game.overlay) lock(); });
 addEventListener('keydown', (e) => {
-  if (e.code !== 'Escape' || e.defaultPrevented || e.repeat) return;
+  if (e.code !== 'Escape' || e.defaultPrevented || e.repeat || document.querySelector('.skin-studio[open]')) return;
   if (game.overlay === 'gm' && game.painelGM?.acabouDeSoltar()) return;
   if (game.overlay) closeOverlay();
   else if (game.state === 'PLAYING' && game.painelGM?.abrir()) e.preventDefault();
@@ -646,6 +661,7 @@ function switchDimension(m) {
   const prevDim = game.dim;
   const d = m.dim || 0;
   startWorld(game.seed, d, m.gen || null);
+  for (const p of m.superCrateras || []) world.registrarCratera(p);
   world.loadEdits(m.edits || {});
   world.loadMinis(m.minis || {});
   avatars.clear(); game.players.clear();
@@ -712,6 +728,8 @@ function salvarSolo() {
   if (offlineDirty) {
     store.set('off.' + game.slug, world.exportEdits());
     store.set('off.minis.' + game.slug, world.exportMinis());
+    const crateras = world.listarCrateras();
+    if (crateras.length) store.set('off.crateras.' + game.slug, crateras);
     offlineDirty = false;
   }
   store.set('relogio.' + game.slug, net.clockState());
@@ -1030,7 +1048,9 @@ function frameGame(dt, alpha) {
       ui.setTrunkMode(interaction.squareTrunk, showTrunk);
       if (!handled) {
         effects.target(interaction.target);
-        let hint = crafting.hintFor(interaction.target) || (game.hint ? game.hint(interaction.targetName()) : interaction.targetName());
+        const alvo = interaction.target;
+        let hint = alvo.hit && alvo.id === B.SUPER_BOMBA ? machines.superBomba.dica([alvo.x, alvo.y, alvo.z])
+          : crafting.hintFor(alvo) || (game.hint ? game.hint(interaction.targetName()) : interaction.targetName());
         if (showTrunk) {
           const tag = `Tronco ${interaction.squareTrunk ? 'quadrado' : 'redondo'} (K alterna)`;
           hint = hint ? `${hint} · ${tag}` : tag;
@@ -1161,13 +1181,16 @@ function frameGame(dt, alpha) {
   }
 
   const camWorld = camera.getWorldPosition(menuCam);
-  atmosphere.state.tunelSeco = game.ferrovia.seco(camWorld.x, camWorld.y, camWorld.z);
+  atmosphere.state.tunelSeco = game.ferrovia.seco(camWorld.x, camWorld.y, camWorld.z)
+    || (game.dim === 0 && bolsaoSeco(world.getBlock, camWorld.x, camWorld.y, camWorld.z, SEA));
   const under = !atmosphere.state.tunelSeco && wetAt(world.getBlock, camWorld.x, camWorld.y, camWorld.z);
   atmosphere.state.underwater = under;
   ui.setUnderwater(under);
   frameAudio(dt, camWorld, under);
   atmosphere.update(net.time(), world.radius * 16, game.dim === 1, game.dim === 0 ? SEA + 0.88 : game.dim === DIM_MACRO ? MACRO_SEA + 0.88 : -1e4);
   avatars.update(dt);
+  fumacaSkin(self, particulasMc, dt);
+  for (const { body } of avatars.list.values()) fumacaSkin(body, particulasMc, dt);
   effects.update(dt);
   for (const f of game.hooks.frame) f(dt, alpha);
   if (game.xr?.sync) game.xr.sync();

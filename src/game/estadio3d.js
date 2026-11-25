@@ -886,6 +886,28 @@ function criarTexturaConeVolumetrico() {
   return tex;
 }
 
+function mergeTranslatedGeos(baseGeo, offsets) {
+  const pos = baseGeo.attributes.position.array, norm = baseGeo.attributes.normal.array, uv = baseGeo.attributes.uv.array;
+  const idx = baseGeo.index.array, vCount = baseGeo.attributes.position.count, iCount = idx.length, n = offsets.length;
+  const outPos = new Float32Array(vCount * 3 * n), outNorm = new Float32Array(vCount * 3 * n), outUv = new Float32Array(vCount * 2 * n);
+  const outIdx = new Uint16Array(iCount * n);
+  for (let k = 0; k < n; k++) {
+    const [ox, oy, oz] = offsets[k], vOff = k * vCount, pOff = vOff * 3, uOff = vOff * 2, iOff = k * iCount;
+    for (let i = 0; i < vCount * 3; i += 3) {
+      outPos[pOff + i] = pos[i] + ox; outPos[pOff + i + 1] = pos[i + 1] + oy; outPos[pOff + i + 2] = pos[i + 2] + oz;
+    }
+    outNorm.set(norm, pOff); outUv.set(uv, uOff);
+    for (let i = 0; i < iCount; i++) outIdx[iOff + i] = idx[i] + vOff;
+  }
+  baseGeo.dispose();
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(outPos, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(outNorm, 3));
+  g.setAttribute('uv', new THREE.BufferAttribute(outUv, 2));
+  g.setIndex(new THREE.BufferAttribute(outIdx, 1));
+  return g;
+}
+
 // ---- Torres de refletores com treliças diagonais, banco de LEDs 3×6 e cones/halos volumétricos aditivos -----------
 function criarRefletores(campo, pcMode) {
   const ex = campo.eixo === 'x';
@@ -928,8 +950,10 @@ function criarRefletores(campo, pcMode) {
   const pedGeo = new THREE.BoxGeometry(1.35, 0.85, 1.35);
   const strutGeo = new THREE.CylinderGeometry(1, 1, 1, 6); // escalado por instância em InstancedMesh
   const bankGeo = new THREE.BoxGeometry(3.2, 1.48, 0.36);
-  const finGeo = new THREE.BoxGeometry(3.05, 0.14, 0.18);
-  const ledGeo = new THREE.PlaneGeometry(0.42, 0.34);
+  const finsGeo = mergeTranslatedGeos(new THREE.BoxGeometry(3.05, 0.14, 0.18), [[0, -0.42, -0.22], [0, 0, -0.22], [0, 0.42, -0.22]]);
+  const ledOffsets = [];
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 6; c++) ledOffsets.push([(c - 2.5) * 0.49, (r - 1) * 0.44, 0.19]);
+  const ledsGeo = mergeTranslatedGeos(new THREE.PlaneGeometry(0.42, 0.34), ledOffsets);
   const catwalkGeo = new THREE.BoxGeometry(2.6, 0.1, 0.75);
   const beaconGeo = new THREE.SphereGeometry(0.11, 10, 8);
   const haloGeo = new THREE.PlaneGeometry(5.6, 3.6);
@@ -1005,19 +1029,8 @@ function criarRefletores(campo, pcMode) {
     bank.rotation.x = 0.52;
     const housing = new THREE.Mesh(bankGeo, headMat);
     housing.castShadow = pcMode;
-    bank.add(housing);
-    // Aletas traseiras de dissipação
-    for (const fy of [-0.42, 0, 0.42]) {
-      const fin = new THREE.Mesh(finGeo, steelMat);
-      fin.position.set(0, fy, -0.22);
-      bank.add(fin);
-    }
-    // Matriz 3×6 de módulos LED individuais
-    for (let r = 0; r < 3; r++) for (let c = 0; c < 6; c++) {
-      const led = new THREE.Mesh(ledGeo, lampMat);
-      led.position.set((c - 2.5) * 0.49, (r - 1) * 0.44, 0.19);
-      bank.add(led);
-    }
+    // Aletas traseiras de dissipação + matriz 3×6 de módulos LED fundidas em 2 malhas compartilhadas
+    bank.add(housing, new THREE.Mesh(finsGeo, steelMat), new THREE.Mesh(ledsGeo, lampMat));
     // Halo luminoso aditivo frontal + cone volumétrico descendo até o campo
     const halo = new THREE.Mesh(haloGeo, haloMat);
     halo.position.set(0, 0, 0.24);
@@ -1388,11 +1401,16 @@ function criarArquibancadas3D(campo, custom, pcMode = true) {
   const backGeo = new THREE.BoxGeometry(0.66, 0.46, 0.085);
   const crestGeo = new THREE.BoxGeometry(0.60, 0.085, 0.098);
   const legGeo = new THREE.BoxGeometry(0.075, 0.34, 0.095);
+  const railGeo = new THREE.BoxGeometry(1, 0.09, 0.14);
+  const riserGeo = new THREE.BoxGeometry(1, 0.14, 0.88);
 
   const instSeat = new THREE.InstancedMesh(seatGeo, seatMat, totalSeats);
   const instBack = new THREE.InstancedMesh(backGeo, seatMat, totalSeats);
   const instCrest = new THREE.InstancedMesh(crestGeo, seatMat, totalSeats);
   const instLegs = new THREE.InstancedMesh(legGeo, frameMat, totalSeats * 2);
+  const instRail = new THREE.InstancedMesh(railGeo, frameMat, arqs.length);
+  const instRiser = new THREE.InstancedMesh(riserGeo, concreteMat, arqs.length);
+  instRiser.receiveShadow = true;
 
   const cTeam = [new THREE.Color(custom.times[0].cor), new THREE.Color(custom.times[1].cor)];
   const cAccent = [new THREE.Color(custom.times[0].cor2), new THREE.Color(custom.times[1].cor2)];
@@ -1408,6 +1426,7 @@ function criarArquibancadas3D(campo, custom, pcMode = true) {
 
   let sIdx = 0;
   let lIdx = 0;
+  let rIdx = 0;
 
   for (const a of arqs) {
     const lado = a.lado ? 1 : 0;
@@ -1420,14 +1439,18 @@ function criarArquibancadas3D(campo, custom, pcMode = true) {
     const rowLen = Math.max(1, xEnd - xStart + 1);
     const rowCenterX = (xStart + xEnd) * 0.5 + 0.5;
 
-    // Viga metálica contínua sob cada fileira + degrau de acabamento
-    const railBeam = new THREE.Mesh(new THREE.BoxGeometry(rowLen, 0.09, 0.14), frameMat);
-    railBeam.position.set(rowCenterX, a.y + 0.08, a.z + 0.5);
-    grp.add(railBeam);
-    const riser = new THREE.Mesh(new THREE.BoxGeometry(rowLen + 0.12, 0.14, 0.88), concreteMat);
-    riser.position.set(rowCenterX, a.y - 0.15, a.z + 0.5);
-    riser.receiveShadow = true;
-    grp.add(riser);
+    // Viga metálica contínua sob cada fileira + degrau de acabamento (instanciados: 2 draw calls no total)
+    dummy.position.set(rowCenterX, a.y + 0.08, a.z + 0.5);
+    dummy.quaternion.identity();
+    dummy.scale.set(rowLen, 1, 1);
+    dummy.updateMatrix();
+    instRail.setMatrixAt(rIdx, dummy.matrix);
+
+    dummy.position.set(rowCenterX, a.y - 0.15, a.z + 0.5);
+    dummy.scale.set(rowLen + 0.12, 1, 1);
+    dummy.updateMatrix();
+    instRiser.setMatrixAt(rIdx, dummy.matrix);
+    rIdx++;
 
     for (let x = xStart; x <= xEnd; x++) {
       basePos.set(x + 0.5, a.y - 0.12, a.z + 0.5);
@@ -1470,7 +1493,9 @@ function criarArquibancadas3D(campo, custom, pcMode = true) {
     grp.add(im);
   }
   instLegs.instanceMatrix.needsUpdate = true;
-  grp.add(instLegs);
+  instRail.instanceMatrix.needsUpdate = true;
+  instRiser.instanceMatrix.needsUpdate = true;
+  grp.add(instLegs, instRail, instRiser);
 
   return { grp, assentos };
 }
@@ -1597,7 +1622,7 @@ export function createEstadio3D({ scene, game } = {}) {
   const root = new THREE.Group(); root.name = 'estadio-futebol-3d';
   scene?.add(root);
   let chave = '';
-  let redes = [], panos = [], refletores = null, placas = null, assentos = [];
+  let redes = [], panos = [], refletores = null, placas = null, assentos = [], assentosBox = null;
 
   // Grupo e geometrias compartilhadas de VFX (limpos com rigor em limpar()/dispose())
   const vfxGrp = new THREE.Group(); vfxGrp.name = 'futebol-vfx';
@@ -1641,7 +1666,7 @@ export function createEstadio3D({ scene, game } = {}) {
   function limpar(cfgAtivo = null) {
     disposeSubtree(root);
     while (root.children.length) root.remove(root.children[0]);
-    redes = []; panos = []; refletores = null; placas = null; assentos = [];
+    redes = []; panos = []; refletores = null; placas = null; assentos = []; assentosBox = null;
     limparVfx();
     pruneCamisaCache(cfgAtivo);
     pruneBolaCache(cfgAtivo?.bola?.estilo);
@@ -1702,6 +1727,16 @@ export function createEstadio3D({ scene, game } = {}) {
       const arq = criarArquibancadas3D(campo, cfg, pcMode);
       root.add(arq.grp);
       assentos = arq.assentos;
+      if (assentos.length) {
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, minZ = Infinity, maxZ = -Infinity;
+        for (let i = 0; i < assentos.length; i++) {
+          const a = assentos[i];
+          if (a.x < minX) minX = a.x; if (a.x > maxX) maxX = a.x;
+          if (a.y < minY) minY = a.y; if (a.y > maxY) maxY = a.y;
+          if (a.z < minZ) minZ = a.z; if (a.z > maxZ) maxZ = a.z;
+        }
+        assentosBox = { minX: minX - 2.7, maxX: maxX + 2.7, minY: minY - 2.7, maxY: maxY + 2.7, minZ: minZ - 2.7, maxZ: maxZ + 2.7 };
+      }
     }
     root.updateMatrixWorld(true);
   }
@@ -2121,10 +2156,12 @@ export function createEstadio3D({ scene, game } = {}) {
     const py = Array.isArray(pos) ? pos[1] : pos.y;
     const pz = Array.isArray(pos) ? pos[2] : pos.z;
     if (!Number.isFinite(px) || !Number.isFinite(py) || !Number.isFinite(pz)) return null;
-    let best = null, dm = 2.6;
-    for (const a of assentos) {
-      const d = Math.hypot(px - a.x, py - a.y, pz - a.z);
-      if (d < dm) { dm = d; best = a; }
+    if (assentosBox && (px < assentosBox.minX || px > assentosBox.maxX || py < assentosBox.minY || py > assentosBox.maxY || pz < assentosBox.minZ || pz > assentosBox.maxZ)) return null;
+    let best = null, dm2 = 2.6 * 2.6;
+    for (let i = 0; i < assentos.length; i++) {
+      const a = assentos[i], dx = px - a.x, dy = py - a.y, dz = pz - a.z;
+      const d2 = dx * dx + dy * dy + dz * dz;
+      if (d2 < dm2) { dm2 = d2; best = a; }
     }
     return best;
   }

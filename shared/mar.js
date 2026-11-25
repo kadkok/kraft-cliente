@@ -26,7 +26,7 @@ const ESPECTRO = [
 export const N_ONDULACAO = 3;   // as primeiras do espectro: ondulação de mar aberto; o resto, mar de vento
 export const ONDAS = ESPECTRO.map(([L, ka, ang, fase]) => {
   const k = TAU / L;
-  return { L, k, A: ka / k, ang, fase, w: Math.sqrt(G * k) };
+  return { L, k, A: ka / k, ang, cosAng: Math.cos(ang), senAng: Math.sin(ang), fase, w: Math.sqrt(G * k) };
 });
 // arrebentação: comprimento entre cristas (m), período (s), amplitude ao largo (m), fundura em que quebra = altura/γ
 export const COSTA = { L: 23, T: 10, A0: 1.05, gama: 0.42, largo: 110 };
@@ -58,11 +58,6 @@ export function ventoMar(w) {
   const l = Math.hypot(x, z) || 1;
   return { x: x / l, z: z / l, f: Math.min(2, Math.max(0.2, f)) };
 }
-// quanto do mar aberto chega aqui: o raso encolhe as ondas longas; dentro da ilha (lagoas) o mar some
-function atenua(o, prof, s) {
-  const fundo = 0.12 + 0.88 * sstep(0, o.L * 0.22, prof);
-  return fundo * sstep(-0.1, 0.7, prof) * sstep(-24, 6, s);
-}
 // perfil de uma onda da arrebentação ao passar (u = 0 na crista; a frente, que encara a praia, é íngreme)
 function perfil(u) { return u > 0.7 ? Math.pow(sstep(0.84, 1, u), 1.6) : 1 - sstep(0, 0.6, u); }
 
@@ -70,21 +65,22 @@ function perfil(u) { return u > 0.7 ? Math.pow(sstep(0.84, 1, u), 1.6) : 1 - sst
 // vento = direção {x, y}; E = estado do mar; fase = fase acumulada da arrebentação (ver render/oceano.js).
 export function alturaMar(x, z, t, prof, s, vento, E = 0.35, fase = t / 9.5) {
   const v = ventoMar(vento), M = multMar(E);
+  const lamina = sstep(-0.1, 0.7, prof), litoral = sstep(-24, 6, s);
   let y = M.ressaca * (1 - sstep(60, 200, s));
   for (let i = 0; i < ONDAS.length; i++) {
     const o = ONDAS[i], amp = i < N_ONDULACAO ? M.ondulacao : M.vento;
-    const ca = Math.cos(o.ang), sa = Math.sin(o.ang);
-    const dx = v.x * ca - v.z * sa, dz = v.x * sa + v.z * ca;
-    y += o.A * amp * atenua(o, prof, s) * Math.sin(o.k * (dx * x + dz * z) - o.w * t + o.fase);
+    const dx = v.x * o.cosAng - v.z * o.senAng, dz = v.x * o.senAng + v.z * o.cosAng;
+    const atenuacao = (0.12 + 0.88 * sstep(0, o.L * 0.22, prof)) * lamina * litoral;
+    y += o.A * amp * atenuacao * Math.sin(o.k * (dx * x + dz * z) - o.w * t + o.fase);
   }
-  return y + costa(x, z, fase, prof, s, E).y;
+  return y + costa(x, z, fase, prof, s, E, M.costa).y;
 }
 
 // arrebentação num ponto: { y, espuma }; fase = quantas séries já passaram (cresce 1/período por segundo)
-export function costa(x, z, fase, prof, s, E = 0.35) {
-  const Mc = multMar(E).costa;
+export function costa(x, z, fase, prof, s, E = 0.35, multiplicador) {
   const w = sstep(COSTA.largo, COSTA.largo * 0.5, s) * sstep(-14, -4, s);
   if (w <= 0) return { y: 0, espuma: 0 };
+  const Mc = multiplicador ?? multMar(E).costa;
   const curva = 4.5 * Math.sin(x * 0.021 + z * 0.013) + 3 * Math.sin(z * 0.029 - x * 0.008);
   const f = (s + curva) / COSTA.L + fase;
   const n = Math.floor(f), u = f - n;

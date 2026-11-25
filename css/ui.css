@@ -378,3 +378,129 @@ input[type=color] { pointer-events: auto; width: 34px; height: 24px; padding: 0;
 .aparelho > .btn { width: 100%; }
 .aparelho .note { margin-bottom: 0; }
 #menu .card > .btn.instalar { justify-self: start; }
+
+.skin-studio {
+  width: min(72rem, calc(100% - 1.5rem));
+  max-width: none;
+  max-height: calc(100dvh - 1.5rem);
+  padding: 0;
+  border: 1px solid #385263;
+  border-radius: 1rem;
+  background: linear-gradient(165deg, #142331, #0d1720 70%);
+  color: #edf5fb;
+  box-shadow: 0 1rem 4rem #0009;
+  overflow: auto;
+}
+.skin-studio::backdrop { background: #050b11c9; }
+.skin-studio header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: .75rem 1.25rem;
+  background: linear-gradient(90deg, #1a2b39, #13212c);
+  border-bottom: 1px solid #385263;
+}
+.skin-studio h2 { margin: 0; }
+.skin-layout { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 1rem; padding: 1rem; }
+.skin-preview, .skin-controls { min-width: 0; display: grid; gap: .65rem; align-content: start; }
+.skin-preview [data-stage] {
+  height: clamp(14rem, 57dvh, 40rem);
+  border-radius: .75rem;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 40%, #385b68, #14212f 72%);
+}
+.skin-preview canvas { display: block; width: 100%; height: 100%; }
+.skin-studio fieldset { min-width: 0; margin: 0; padding: .55rem .7rem; border: 1px solid #385263; border-radius: .6rem; }
+.skin-studio label { display: flex; align-items: center; justify-content: space-between; gap: .6rem; min-width: 0; padding: .25rem 0; }
+.skin-studio input, .skin-studio select { min-width: 0; max-width: 62%; accent-color: #7de4df; }
+.skin-studio input[type="range"] { width: min(60%, 19rem); }
+.skin-studio button:not(.btn), .skin-studio input[type="text"], .skin-studio select {
+  padding: .38rem .6rem;
+  border: 1px solid #476273;
+  border-radius: .45rem;
+  background: #1b2d3b;
+  color: inherit;
+}
+.skin-studio button[aria-pressed="true"] { border-color: #7de4df; background: #24464e; }
+.skin-studio button:disabled { opacity: .55; }
+.skin-studio [data-status] { margin: 0; min-height: 1.2em; color: #a8e2dd; }
+.skin-actions, .skin-tabs { display: flex; flex-wrap: wrap; gap: .4rem; }
+@media (max-width: 650px) {
+  .skin-layout { grid-template-columns: minmax(0, 1fr); }
+  .skin-preview [data-stage] { height: clamp(10rem, 32dvh, 20rem); }
+}
+
+.skin-studio.skin-expanded { width: calc(100vw - 1rem); height: calc(100dvh - 1rem); max-height: none; }
+.skin-studio [hidden] { display: none !important; }
+.skin-studio [data-stage] {
+  touch-action: none;
+  cursor: grab;
+  background:
+    radial-gradient(ellipse at 50% 85%, #111b15 7%, transparent 39%),
+    radial-gradient(ellipse at 50% 32%, #48614f, #182723 64%, #111b20);
+}
+.skin-studio [data-stage]:active { cursor: grabbing; }
+.skin-page { display: grid; gap: .65rem; align-content: start; }
+.skin-sections { padding-bottom: .6rem; border-bottom: 1px solid #385263; }
+.skin-studio button.skin-look {
+  display: grid;
+  gap: .22rem;
+  padding: .9rem 1rem;
+  text-align: left;
+  background: linear-gradient(110deg, #375443, #22392d);
+  border-color: #617c65;
+}
+.skin-look span { font-size: 1.15rem; font-weight: 700; }
+.skin-look small { color: #d5e6d5; }
+
+/* Estúdio de skins: abas Skin (.png), Pintor e Criar personagem (22/11/2026) */
+.skin-studio .skin-nota { margin: 0; font-size: .9rem; line-height: 1.35; color: #c9dbe6; }
+.skin-studio hr { border: 0; border-top: 1px solid #2c4252; margin: .35rem 0; }
+.skin-base-atual { display: flex; align-items: center; gap: .8rem; padding: .5rem; border-radius: .6rem; background: linear-gradient(120deg, #1b2e3c, #142430); }
+.skin-base-atual canvas { width: 128px; height: 128px; image-rendering: pixelated; border-radius: .35rem; background: repeating-conic-gradient(#26323d 0 25%, #1c2630 0 50%) 0 0 / 16px 16px; }
+.skin-base-atual span { font-size: .92rem; }
+.pintor-linha { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
+.pintor-linha label { flex: 1 1 12rem; }
+.pintor-tela { max-width: 100%; max-height: min(26rem, 52dvh); overflow: auto; border-radius: .5rem; border: 1px solid #385263; background: linear-gradient(135deg, #0f1a23, #0a1219); overscroll-behavior: contain; }
+.pintor-tela canvas { display: block; touch-action: none; cursor: crosshair; image-rendering: pixelated; }
+.pintor-regiao { margin: 0; min-height: 1.2em; font-size: .88rem; color: #e6d9a8; }
+.pintor-cores { display: flex; flex-wrap: wrap; gap: .3rem; }
+.skin-studio button.pintor-amostra { width: 1.9rem; height: 1.9rem; padding: 0; border-radius: .4rem; border: 1px solid #ffffff40; }
+.pintor-legenda { display: flex; flex-wrap: wrap; gap: .35rem .8rem; font-size: .8rem; color: #c9dbe6; }
+.pintor-legenda i { display: inline-block; width: .8rem; height: .8rem; margin-right: .3rem; vertical-align: -1px; border-radius: .15rem; }
+.pintor-legenda i.tracejado { background: none; border: 1.5px dashed #c9dbe6; }
+.skin-studio [data-c-partes] { display: grid; gap: 0; padding-left: .6rem; border-left: 2px solid #2c4252; }
+.criador-abas button { flex: 1 1 auto; }
+.skin-studio .skin-sections button { background: linear-gradient(180deg, #213646, #182a37); }
+.skin-studio .skin-sections button[aria-pressed="true"] { background: linear-gradient(180deg, #2d5a60, #1f4249); }
+@media (max-width: 650px) {
+  .pintor-tela { max-height: 44dvh; }
+  .skin-studio button.pintor-amostra { width: 2.2rem; height: 2.2rem; }
+}
+/* a prévia 3D fica à vista enquanto os controles rolam (pintor e criador são compridos) */
+.skin-preview { position: sticky; top: 4.2rem; align-self: start; }
+@media (max-width: 650px) {
+  .skin-preview { position: static; }
+  /* no celular, só com o pintor aberto: prévia pequena presa no alto, para ver o boneco enquanto pinta */
+  .skin-studio.skin-pintando .skin-preview { position: sticky; top: 3.4rem; z-index: 1; padding-bottom: .4rem; background: linear-gradient(180deg, #13222f, #0f1b25); }
+  .skin-studio.skin-pintando .skin-preview > label, .skin-studio.skin-pintando .skin-preview > .skin-actions { display: none; }
+  .skin-studio.skin-pintando .skin-preview [data-stage] { height: clamp(8rem, 22dvh, 12rem); }
+}
+
+/* Estúdio de skins · aba "Mockup para IA" (game/estudio-mockup.js) */
+.skin-studio label.skin-m-colar { flex-direction: column; align-items: stretch; }
+.skin-studio .skin-m-colar textarea {
+  width: 100%; max-width: none; min-height: 5.5rem; resize: vertical; box-sizing: border-box; padding: .45rem .55rem;
+  border: 1px solid #385263; border-radius: .5rem; background: #0b141b; color: #e8f3f2; font: .82rem/1.35 ui-monospace, monospace;
+}
+.skin-m-relatorio { display: grid; gap: .3rem; font-size: .9rem; line-height: 1.35; color: #d7e7ee; }
+.skin-m-relatorio:empty { display: none; }
+.skin-m-relatorio p, .skin-m-relatorio ul { margin: 0; }
+.skin-m-relatorio ul { padding-left: 1.1rem; }
+.skin-m-ok { color: #a8f0c6; }
+.skin-m-erro, .skin-m-relatorio:has(.skin-m-erro) li { color: #ffb4a8; }
+.skin-m-ideia { color: #ffd98a; }
+.skin-m-aviso li { color: #c9dbe6; }

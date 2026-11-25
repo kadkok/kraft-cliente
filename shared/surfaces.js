@@ -12,6 +12,8 @@ const CORNERS=[[0,0],[1,0],[1,1],[0,1]];
 const SIDES=[5,0,4,1];
 const full = id => id===-1 || (id>0 && SOLID[id]===1);
 const noEdit=()=>false;
+const colH = new Int16Array(9), colA = new Uint8Array(9), colS = new Uint8Array(9);
+const cornerH = new Int16Array(4);
 
 // A altura é compartilhada entre colunas e também entre camadas. Uma encosta
 // diagonal pode atravessar dois blocos: recortá-la só no bloco de cima deixava
@@ -29,34 +31,47 @@ export function surfaceShape(get, edited=noEdit, x,y,z) {
     if(!TERRAIN[above]||edited(x,y+1,z)||full(get(x,y+2,z)))return CUBE;
     top++;
   }
-  const columns=new Map();
-  const column=(xx,zz)=>{
-    const key=xx+','+zz;if(columns.has(key))return columns.get(key);
-    let height=top-3,anchor=false;
-    for(let yy=top+1;yy>=top-3;yy--){
-      const b=get(xx,yy,zz);if(b===-1){height=top+3;anchor=true;break;}
-      if(full(b)){
-        if(edited(xx,yy,zz)||!TERRAIN[b])anchor=true;
-        height=yy+1;break;
-      }
-    }
-    const result={height,anchor};columns.set(key,result);return result;
-  };
-  const heights=[];
+  colS.fill(0);
+  let allGe1 = true, allLe0 = true, maxH = -999, code = 0;
   for(let i=0;i<4;i++){
-    const vx=x+CORNERS[i][0],vz=z+CORNERS[i][1];
-    let low=Infinity,high=-Infinity,anchor=false;
-    for(let dz=-1;dz<=0;dz++)for(let dx=-1;dx<=0;dx++){
-      const c=column(vx+dx,vz+dz);low=Math.min(low,c.height);high=Math.max(high,c.height);anchor ||= c.anchor;
+    const cx=CORNERS[i][0],cz=CORNERS[i][1];
+    let low=9999,high=-9999,anchor=0;
+    for(let dz=0;dz<=1;dz++)for(let dx=0;dx<=1;dx++){
+      const idx=(cx+dx)+(cz+dz)*3;
+      let h, a;
+      if(colS[idx]){
+        h=colH[idx];a=colA[idx];
+      }else{
+        const xx=x+cx+dx-1,zz=z+cz+dz-1;
+        h=top-3;a=0;
+        for(let yy=top+1;yy>=top-3;yy--){
+          const bb=get(xx,yy,zz);
+          if(bb===-1){h=top+3;a=1;break;}
+          if(full(bb)){
+            if(edited(xx,yy,zz)||!TERRAIN[bb])a=1;
+            h=yy+1;break;
+          }
+        }
+        colH[idx]=h;colA[idx]=a;colS[idx]=1;
+      }
+      if(h<low)low=h;
+      if(h>high)high=h;
+      anchor|=a;
     }
     const edge=high-low>2||low<top-2?Math.max(top-1,Math.min(top,low)):low;
-    heights.push((anchor?top:edge)-y);
+    const hv=(anchor?top:edge)-y;
+    cornerH[i]=hv;
+    if(hv<1)allGe1=false;
+    if(hv>0)allLe0=false;
+    if(hv>maxH)maxH=hv;
+    const cl=hv<-1?-1:hv>2?2:hv;
+    code+=(cl+1)<<(i*2);
   }
-  if(heights.every(h=>h>=1))return CUBE;
+  if(allGe1)return CUBE;
   // Pico isolado volta a cubo; sem pontas piramidais nem degraus no meio da encosta.
-  if(Math.max(...heights)<top-y)return CUBE;
-  if(heights.every(h=>h<=0))return 16;
-  return 16+heights.reduce((n,h,i)=>n+((Math.max(-1,Math.min(2,h))+1)<<(i*2)),0);
+  if(maxH<top-y)return CUBE;
+  if(allLe0)return 16;
+  return 16+code;
 }
 
 // Centro da rampa pela diagonal de menor desnível (sem levantar telhados/pirâmides).

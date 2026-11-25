@@ -1,6 +1,7 @@
 import { raycastVoxels } from '../world/raycast.js';
 import { ALCANCE_PORTA, distanciaCabine, saidaHelicoptero, assentarHelicoptero } from '../../shared/embarque-helicoptero.js';
 import { EYE_H, SEA, Y_MIN } from '../../shared/constants.js';
+import { MAR_NIVEL } from '../../shared/mar.js';
 import { LEVEL, SOLID } from '../../shared/blocks.js';
 import { dentroDoPalacio } from '../../shared/fortaleza.js';
 import {
@@ -14,8 +15,13 @@ import {
   formaValida,
 } from '../../shared/veiculos-kids.js';
 import { indicePresente, posePeloMovimento } from '../../shared/presenca-veiculos.js';
-import { criarVisual, criarRastro } from '../render/veiculos-kids.js';
+import { criarVisual, criarRastro, emissaoRastro } from '../render/veiculos-kids.js';
 import { painelGaragem } from './garagem.js';
+
+const somMotor = {
+  balao: 'ambiente.fogo', jipe: 'ambiente.carro', barco: 'ambiente.boat_engine',
+  submarino: 'ambiente.motor', aviao: 'ambiente.helice', helicoptero: 'ambiente.helice',
+};
 
 export function initGaragem({
   game,
@@ -50,24 +56,27 @@ export function initGaragem({
       k = x + ',' + z;
     let dados = colunas.get(k);
     if (!dados) {
-      let alto = game.gen.height(x, z);
-      let molhado = alto < SEA;
-      if (world.isLoaded(x, z)) {
-        const topo = world.topSolid(x, z);
-        if (topo >= 0) {
-          let y = topo,
-            id = world.getBlock(x, y, z);
-          molhado = !!LEVEL[id]; // O teto de uma galeria ou uma geleira conta como piso.
-          while (y > Y_MIN && !SOLID[id]) id = world.getBlock(x, --y, z);
-          alto = y;
-        }
+      let alto, molhado;
+      const topo = world.isLoaded(x, z) ? world.topSolid(x, z) : -1;
+      if (topo >= 0) {
+        alto = topo;
+        let id = world.getBlock(x, alto, z);
+        molhado = !!LEVEL[id]; // O teto de uma galeria ou uma geleira conta como piso.
+        while (alto > Y_MIN && !SOLID[id]) id = world.getBlock(x, --alto, z);
+      } else {
+        alto = game.gen.height(x, z);
+        molhado = alto < SEA;
       }
-      dados = { chao: alto + 1, molhado };
+      dados = { chao: alto + 1, molhado, agua: SEA + 0.9 };
       colunas.set(k, dados);
     }
-    return { ...dados, agua: dados.molhado ? agua(px, pz) : SEA + 0.9 };
+    return dados.molhado ? { chao: dados.chao, molhado: true, agua: agua(px, pz) } : dados;
   }
-  const ambiente = { sondar, aleatorio: Math.random, tempo: 0 };
+  const ambiente = {
+    sondar, alturaAgua: agua, aleatorio: Math.random, tempo: 0,
+    get nivelMar() { return game.mar?.ligado ? MAR_NIVEL : SEA + 0.9; },
+    get vento() { return game.weather?.wind; },
+  };
   let rastro;
   function posLivre(v) {
     return !net.online || game.gmFortaleza || !dentroDoPalacio(game.gen.fortaleza, pontoBanco(v));
@@ -435,29 +444,25 @@ export function initGaragem({
     }
     if (piloto && veiculo) {
       modelo?.atualizar(veiculo, dt);
-      (rastro ||= criarRastro(scene)).atualizar(veiculo, dt);
+      const emissao = emissaoRastro(veiculo);
+      if (emissao && !rastro) rastro = criarRastro(scene);
+      rastro?.atualizar(veiculo, dt, emissao);
       rel -= dt;
       if (rel <= 0) {
         rel = 0.2;
-        const v = veiculo,
-          sons = {
-            balao: 'ambiente.fogo',
-            jipe: 'ambiente.carro',
-            barco: 'ambiente.boat_engine',
-            submarino: 'ambiente.motor',
-            aviao: 'ambiente.helice',
-            helicoptero: 'ambiente.helice',
-          };
-        if (game.state === 'PLAYING' && (v.tipo !== 'balao' || v.vy > 0.4))
+        const v = veiculo;
+        if (game.state === 'PLAYING' && (v.tipo !== 'balao' || v.vy > 0.4)) {
+          const carga = v.tipo === 'jipe' ? Math.min(1, Math.abs(v.v) / 9) : v.rpm;
+          const abafado = v.tipo === 'submarino' ? Math.min(1, -v.prof / 8) : 0;
           game.audio?.setEmitter?.('garagem-piloto', {
-            key: sons[v.tipo],
+            key: somMotor[v.tipo],
             pos: pontoBanco(v),
-            volume: 0.18,
-            pitch: 0.8 + Math.min(0.55, Math.abs(v.v) * 0.038),
+            volume: v.tipo === 'balao' ? 0.18 : (0.11 + 0.12 * carga) * (1 - 0.3 * abafado),
+            pitch: v.tipo === 'balao' ? 1 : 0.72 + 0.55 * carga - 0.09 * abafado,
             refDist: 3,
             maxDist: 50,
           });
-        else game.audio?.removeEmitter?.('garagem-piloto');
+        } else game.audio?.removeEmitter?.('garagem-piloto');
       }
     } else {
       rastro?.atualizar(null, dt);
