@@ -475,7 +475,8 @@ void twApplySandAndShore(
   float maxRunup = (0.24 + 0.48 * energy) * setMod;
   float curRunup = maxRunup * swEnv;
 
-  if (isSandLayer > 0.5) {
+  // isSandLayer é um peso: 1 = areia de verdade; entre 0 e 1 = sedimento que cobre o fundo do mar (materials.js, 24/11/2026)
+  if (isSandLayer > 0.01) {
     float underW = smoothstep(0.08, -0.55, h);
     float landW = 1.0 - underW;
 
@@ -518,11 +519,12 @@ void twApplySandAndShore(
 
     vec3 targetSand = mix(drySand, underSand, underW);
     // Mistura preservando a identidade do bloco com a riqueza do Tidewater
-    albedo = mix(albedo, targetSand, 0.58);
+    albedo = mix(albedo, targetSand, 0.58 * isSandLayer);
 
     // Perturbação da normal pelas micro-ondulações da areia seca e do fundo submerso
     float rippleSlope = ripWindGrad * 0.11 * landW
                       + (cos(phMega) * fadeMega * 0.14 + cos(phSub) * fadeSub * 0.09) * underW;
+    rippleSlope *= isSandLayer;
     if (abs(rippleSlope) > 1e-4 && Ng.y > 0.5) {
       N = normalize(vec3(N.x - wDir.x * rippleSlope, N.y, N.z - wDir.y * rippleSlope));
     }

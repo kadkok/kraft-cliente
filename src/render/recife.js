@@ -13,6 +13,8 @@ import * as THREE from '../three.js';
 import { U, COMMON } from './materials.js';
 import * as Geo from './recife/geometria.js';
 import { MAR_NIVEL } from '../../shared/mar.js';
+import { AGUA_GLSL } from './agua-clara.js';
+import { CAUSTICA_GLSL } from './causticas.js';
 
 const S = { rock: 0, star: 1, brain: 2, brainWide: 3, porites: 4, acropora: 5, finger: 6, fire: 7, plate: 8, pillar: 9, gorgonian: 10, sponge: 11, urchin: 12, anemone: 13, rubble: 14, grass: 15, fan: 16, plume: 17, lettuce: 18, algae: 19, sargassum: 20, kelp: 21, iridescent: 22, magenta: 23, ship: 24, whale: 25 };
 const MODELS = {
@@ -85,7 +87,23 @@ const LAYERS = [
   { occ: 3, spacing: 1.4, allow: -1, sand: true, types: { meadow: [0, 0, 2.5, 0.6, 0], starfish: [0.1, 0.2, 0.5, 0.3, 0.1], cucumber: [0, 0.1, 0.3, 0.2, 0.3], conch: [0.1, 0.1, 0.4, 0.2, 0.05], halimeda: [0.1, 0.1, 0.6, 0.2, 0], penicillus: [0, 0.05, 0.5, 0.1, 0], magenta: [0, 0.3, 0.6, 0.4, 0.2] } },
 ];
 
-const CEL = 16, RAIO = 58, PERTO = 13;
+// (24/11/2026) Vida até o fundo, a pedido direto do Kadmus com a referência Abyssal Garden ("não foi até as áreas mais
+// profundas do mar, nem mesmo vi bolhas ou peixes em grande quantidade"). Antes nada nascia abaixo de 19 m (quase todo
+// o mar do arquipélago tem 26 a 43 m): agora há a zona FUNDO, com jardins e florestas de alga gigante em manchas largas
+// separadas por areia; os cardumes são grandes (dezenas a centenas de peixes nadando em bloco) e existem em qualquer
+// fundura; há arraias no mar aberto e colunas de bolhas que saem de fontes no chão. Com a água clara vê-se mais longe:
+// o alcance subiu de 58 para 84 m no PC.
+// abundância na zona FUNDO (19 a 70 m), por camada de LAYERS
+const FUNDO = [
+  { slab: 0.9, rock: 1.4, boulder: 1.6, lobes: 0.9, barrelDeep: 1.7, wallPlate: 0.9, ear: 0.6, arch: 0.34, plate: 0.35, brainWide: 0.5 },
+  { lettuce: 0.7, plate: 0.5, tube: 1.6, vase: 1.2, rope: 0.9, ear: 1.0, anemone: 0.5, iridescent: 1.0, magenta: 1.1, lobes: 0.5, rod: 0.4, fan: 0.6, brain: 0.35, fire: 0.25, staghorn: 0.3 },
+  { fanDeep: 2.4, wire: 1.0, blackCoral: 1.0, whip: 1.0, plume: 1.0, rod: 0.9, kelp: 1.3, iridescent: 0.8, fan: 0.8 },
+  { rubble: 0.5, tube: 0.3, magenta: 0.4, rod: 0.2, fan: 0.2, urchin: 0.15, starlet: 0.2 },
+  { starfish: 0.2, cucumber: 0.35, conch: 0.08, magenta: 0.22 },
+];
+const FUNDO_DE = 19, FUNDO_ATE = 70;
+const CEL = 16, RAIO = 84, PERTO = 13, PERTO_MAX = 17;
+const CARDUME_CEL = 32, FONTE_CEL = 24;
 const srgbLin = (h) => { const f = (c) => (c < 0.04045 ? c * 0.0773993808 : Math.pow(c * 0.9478672986 + 0.0521327014, 2.4)); return [f(((h >> 16) & 255) / 255), f(((h >> 8) & 255) / 255), f((h & 255) / 255)]; };
 function hash32(a, b, c) { let h = (a * 374761393 + b * 668265263 + c * 2147483647) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); return (h ^ (h >>> 16)) >>> 0; }
 function rngDe(seed) { let a = seed | 0; return () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -133,6 +151,10 @@ const FS = /* glsl */`
 precision highp float;
 ${COMMON}
 uniform vec3 cameraPosition;
+uniform sampler2D uCaust;
+uniform vec3 uAguaCeu;
+${AGUA_GLSL}
+${CAUSTICA_GLSL}
 in vec3 vWorld, vN, vLocal, vC1, vC2;
 in vec4 vData, vInfo;
 out vec4 outColor;
@@ -200,19 +222,25 @@ void main() {
   vec3 N = normalize(vN); if (!gl_FrontFacing) N = -N;
   vec3 V = normalize(cameraPosition - vWorld);
   float prof = max(${MAR_NIVEL.toFixed(2)} - vWorld.y, 0.0);
-  float ndl = max(dot(N, uLightDir), 0.0);
-  float cau = causticas(vWorld.xz + N.xz * 0.3, uTime) * smoothstep(-0.2, 0.6, N.y) * exp(-prof * 0.08);
+  float distOlho = length(cameraPosition - vWorld);
+  // Luz da água clara (render/agua-clara.js): sol direto pela coluna d'água, com a rede de refração (render/causticas.js),
+  // e a luz difusa de cima pela fundura. O que é fino (alga, leque, capim) deixa passar luz: recebe o sol também por trás.
+  float ndl = clamp((dot(N, uLightDir) + 0.22) / 1.22, 0.0, 1.0);
+  float redeLuz = causticaDoMar(vWorld, ${MAR_NIVEL.toFixed(2)}, distOlho);
+  float cau = max(redeLuz - 1.0, 0.0);                    // quanto a rede passa da média (para as fagulhas da alga)
   float fino = (st == ${S.gorgonian}.0 || st == ${S.fan}.0 || st == ${S.grass}.0 || st == ${S.algae}.0 || st == ${S.sargassum}.0 || st == ${S.plume}.0 || st == ${S.kelp}.0 || st == ${S.iridescent}.0) ? 0.38 : 0.0;
-  vec3 luz = uSunColor * (ndl * (0.75 + cau * 1.6) + fino * 0.3) * exp(-prof * vec3(0.12, 0.035, 0.02)) * 0.85
-           + mix(uAmbGround, uAmbSky, 0.5 + 0.5 * N.y) * (0.45 + 0.55 * ao);
+  float cima = 0.5 + 0.5 * N.y;
+  vec3 solAgua = uSunColor * aguaSol(prof, uLightDir.y);
+  vec3 luz = solAgua * ((ndl * mix(1.0, redeLuz, smoothstep(-0.3, 0.5, N.y)) + fino * 0.3) * 0.9)
+           + (uAguaCeu * aguaCeu(prof) * (0.22 + 0.78 * cima) + solAgua * vec3(0.05, 0.046, 0.034) * (1.0 - cima)) * (0.45 + 0.55 * ao);
   vec3 cor = alb * luz * (0.5 + 0.5 * ao);
   // Fagulhas verde/ouro cintilantes nas colunas de Kelp quando tocadas pela luz e pelas cáusticas
   if (st == ${S.kelp}.0) {
     vec3 H = normalize(uLightDir + V);
-    float cellSpeck = h31(floor(P * 36.0));
-    float glint = smoothstep(0.84, 0.995, cellSpeck) * (0.35 + 0.65 * pow(max(dot(N, H), 0.0), 14.0)) * (0.45 + 1.35 * cau);
+    float cellSpeck = h31(floor(P * 70.0));
+    float glint = smoothstep(0.86, 0.995, cellSpeck) * (0.35 + 0.65 * pow(max(dot(N, H), 0.0), 14.0)) * (0.45 + 1.35 * cau) * smoothstep(0.0035, 0.012, px);
     vec3 goldGreen = mix(vec3(0.22, 1.0, 0.52), vec3(1.0, 0.86, 0.28), fract(cellSpeck * 17.3));
-    cor += goldGreen * glint * 1.35 * exp(-prof * 0.04);
+    cor += goldGreen * glint * 1.35 * exp(-prof * 0.022);
   }
   // Iridescência Fresnel de filme fino + bioluminescência suave na folhagem roxa/rosa, tapete magenta, leques e anêmonas
   if (st == ${S.iridescent}.0 || st == ${S.magenta}.0 || st == ${S.anemone}.0 || st == ${S.fan}.0) {
@@ -224,7 +252,7 @@ void main() {
       cor += mix(vec3(0.88, 0.18, 0.72), vec3(0.32, 0.88, 1.0), fres) * (0.14 + 0.22 * part) * smoothstep(0.25, 1.0, t);
     }
   }
-  vec4 nv = fogAt(length(cameraPosition - vWorld), -V, vWorld.y);
+  vec4 nv = fogAt(distOlho, -V, vWorld.y);
   outColor = vec4(finish(mix(cor, nv.rgb, nv.a)), 1.0);
 }
 `;
@@ -233,50 +261,60 @@ void main() {
 const VS_FAUNA_MAR = /* glsl */`
 precision highp float;
 in vec3 position, normal;
-in vec4 aData, iOrbit, iColor; // iOrbit: (cx, cy, cz, radius), iColor: (r, g, b, phaseAndKind)
+// iOrbit: centro do cardume (xyz) e raio da volta (o sinal é o sentido) · iColor: cor + (fase na volta; + 100 = arraia)
+// iExtra: (segundo raio da volta, sobe-e-desce, espalhamento do cardume em metros, semente deste peixe)
+in vec4 aData, iOrbit, iColor, iExtra;
 uniform mat4 viewMatrix, projectionMatrix;
 uniform vec3 cameraPosition;
 uniform float uTime;
 out vec3 vWorld, vN, vCol;
 out vec4 vData;
+// a volta do cardume: um laço torto, que sobe e desce (o mesmo desenho de caminho do Abyssal Garden)
+vec3 caminho(vec3 c, float R, float R2, float ya, float a) {
+  return c + vec3(cos(a) * R + cos(a * 2.3 + 1.3) * R2, sin(a * 1.7 + 0.6) * ya, sin(a) * R + sin(a * 1.9) * R2);
+}
 void main() {
   float raw = iColor.w;
   float isManta = step(100.0, raw);
   float phase = raw - isManta * 100.0;
   float R = abs(iOrbit.w);
   float dirSign = iOrbit.w >= 0.0 ? 1.0 : -1.0;
-  float speed = isManta > 0.5 ? (0.42 / max(R, 3.0)) : (1.55 / max(R, 1.8));
+  float sem = iExtra.w;
+  // o espalhamento vem com a classe de tamanho do cardume na dezena (0 = miúdos de recife … 3 = peixes grandes de mar aberto)
+  float classe = floor(iExtra.z / 10.0), espalha = iExtra.z - classe * 10.0;
+  // todo o cardume anda na mesma velocidade angular (senão se desfaz); a fase de cada peixe só o põe mais à frente ou atrás
+  float speed = isManta > 0.5 ? (0.42 / max(R, 3.0)) : (1.35 / max(R, 2.5));
   float ang = uTime * speed * dirSign + phase * 6.2831853;
-  // Trajetória suave em 8 / órbita elíptica com oscilação vertical contínua
-  vec2 posXZ = vec2(cos(ang), sin(ang) * (1.0 + 0.18 * cos(ang))) * R;
-  vec2 velXZ = vec2(-sin(ang), cos(ang) * (1.0 + 0.18 * cos(ang)) - sin(ang) * 0.18 * sin(ang)) * dirSign;
-  vec2 fwd = normalize(velXZ + vec2(1e-5, 0.0));
-  vec2 right = vec2(fwd.y, -fwd.x);
-  float scale = isManta > 0.5 ? (1.25 + 0.45 * fract(phase * 7.13)) : (0.72 + 0.38 * fract(phase * 13.7));
+  // lugar deste peixe no cardume (um borrão achatado em volta do caminho) e um vaguear miúdo
+  vec3 hs = fract(sin(vec3(sem * 127.1 + 1.7, sem * 311.7 + 4.1, sem * 74.7 + 9.2)) * 43758.5453) - 0.5;
+  vec3 fora = hs * espalha * vec3(1.0, 0.55, 1.0)
+            + vec3(sin(uTime * 0.7 + sem * 50.0), cos(uTime * 0.9 + sem * 31.0), sin(uTime * 0.6 + sem * 77.0)) * (0.35 * (1.0 - isManta));
+  vec3 p0 = caminho(iOrbit.xyz, R, iExtra.x, iExtra.y, ang) + fora;
+  vec3 p1 = caminho(iOrbit.xyz, R, iExtra.x, iExtra.y, ang + 0.04 * dirSign) + fora;
+  vec3 fwd = normalize(p1 - p0 + vec3(1e-5, 0.0, 0.0));
+  vec3 right = normalize(cross(vec3(0.0, 1.0, 0.0), fwd) + vec3(0.0, 0.0, 1e-5));
+  vec3 up = cross(fwd, right);
+  float scale = isManta > 0.5 ? (1.25 + 0.45 * fract(sem * 7.13)) : (0.9 + 0.5 * fract(sem * 13.7)) * (1.0 + 0.65 * classe);
   vec3 p = position * scale;
   vec3 n = normal;
   if (isManta > 0.5) {
     // Bater de asas gracioso das arraias-manta (onda viajante do peito para a ponta das asas)
     float wx = abs(aData.x);
-    float flap = sin(uTime * 2.35 + phase * 19.0 - wx * 2.2 - aData.y * 1.4) * (0.28 * wx * wx + 0.04 * aData.y) * scale;
+    float flap = sin(uTime * 2.35 + sem * 19.0 - wx * 2.2 - aData.y * 1.4) * (0.28 * wx * wx + 0.04 * aData.y) * scale;
     p.y += flap;
     n = normalize(vec3(n.x - sign(aData.x) * flap * 0.45, n.y, n.z));
   } else {
     // Nado em onda S ao longo da espinha do peixe
     float bt = aData.x;
-    float sway = sin(uTime * 11.5 + phase * 31.0 - bt * 5.2) * (0.045 * bt * bt) * scale;
+    float sway = sin(uTime * (9.0 + 5.0 * fract(sem * 7.0)) + sem * 31.0 - bt * 5.2) * (0.045 * bt * bt) * scale;
     p.x += sway;
   }
-  float bob = sin(uTime * (isManta > 0.5 ? 0.9 : 2.1) + phase * 12.0) * (isManta > 0.5 ? 0.45 : 0.22);
-  vec3 worldPos = vec3(
-    iOrbit.x + right.x * p.x + fwd.x * (-p.z) + posXZ.x,
-    min(${(MAR_NIVEL - 0.75).toFixed(2)}, iOrbit.y + p.y + bob),
-    iOrbit.z + right.y * p.x + fwd.y * (-p.z) + posXZ.y
-  );
-  float fade = 1.0 - smoothstep(${(RAIO * 0.78).toFixed(1)}, ${(RAIO * 0.98).toFixed(1)}, length(worldPos - cameraPosition));
-  worldPos = mix(iOrbit.xyz, worldPos, fade);
+  vec3 worldPos = p0 + right * p.x + up * p.y + fwd * (-p.z);
+  worldPos.y = min(worldPos.y, ${(MAR_NIVEL - 0.6).toFixed(2)});
+  float fade = 1.0 - smoothstep(${(RAIO * 0.80).toFixed(1)}, ${(RAIO * 0.99).toFixed(1)}, length(p0 - cameraPosition));
+  worldPos = mix(p0, worldPos, fade);
   vWorld = worldPos;
-  vN = normalize(vec3(right.x * n.x - fwd.x * n.z, n.y, right.y * n.x - fwd.y * n.z));
+  vN = normalize(right * n.x + up * n.y - fwd * n.z);
   vCol = iColor.rgb;
   vData = vec4(aData.xyz, isManta);
   gl_Position = projectionMatrix * viewMatrix * vec4(worldPos, 1.0);
@@ -287,6 +325,10 @@ const FS_FAUNA_MAR = /* glsl */`
 precision highp float;
 ${COMMON}
 uniform vec3 cameraPosition;
+uniform sampler2D uCaust;
+uniform vec3 uAguaCeu;
+${AGUA_GLSL}
+${CAUSTICA_GLSL}
 in vec3 vWorld, vN, vCol;
 in vec4 vData;
 out vec4 outColor;
@@ -294,26 +336,91 @@ void main() {
   vec3 N = normalize(vN); if (!gl_FrontFacing) N = -N;
   vec3 V = normalize(cameraPosition - vWorld);
   float prof = max(${MAR_NIVEL.toFixed(2)} - vWorld.y, 0.0);
+  float distOlho = length(cameraPosition - vWorld);
   float isManta = vData.w;
   vec3 alb = vCol;
+  float brilho = 0.9;
   if (isManta > 0.5) {
     // Dorso azul-ardósia com marcas claras e ventre prateado
     float belly = 1.0 - vData.z;
     float spots = smoothstep(0.35, 0.7, cos(vData.x * 9.0) * cos(vData.y * 7.0));
     alb = mix(alb * (0.65 + 0.45 * spots), vec3(0.86, 0.92, 0.96), belly * 0.85);
+    brilho = 0.2;
   } else {
     // Listras tropicais vibrantes e cauda iridescente
     float stripe = smoothstep(0.15, 0.55, sin(vData.x * 22.0));
     vec3 accent = vec3(vCol.b, vCol.r * 0.9 + 0.1, vCol.g);
     alb = mix(alb, accent, stripe * 0.55 + vData.z * 0.35);
   }
-  float ndl = max(dot(N, uLightDir), 0.0);
+  // luz da água clara: sol pela coluna d'água com a rede de refração (o cardume cintila ao cruzar os fios de luz)
+  float ndl = clamp(dot(N, uLightDir) * 0.7 + 0.3, 0.0, 1.0);
   float fres = pow(1.0 - max(dot(N, V), 0.0), 2.5);
-  vec3 luz = uSunColor * (ndl * 0.9 + 0.25) * exp(-prof * vec3(0.11, 0.032, 0.018))
-           + mix(uAmbGround, uAmbSky, 0.5 + 0.5 * N.y) * 0.75;
-  vec3 cor = alb * luz + vec3(0.28, 0.82, 0.98) * fres * 0.26;
-  vec4 nv = fogAt(length(cameraPosition - vWorld), -V, vWorld.y);
+  float cima = 0.5 + 0.5 * N.y;
+  vec3 solAgua = uSunColor * aguaSol(prof, uLightDir.y) * mix(1.0, causticaDoMar(vWorld, ${MAR_NIVEL.toFixed(2)}, distOlho), 0.8);
+  vec3 ceuAgua = uAguaCeu * aguaCeu(prof);
+  vec3 luz = solAgua * ndl + ceuAgua * (0.3 + 0.7 * cima) + solAgua * vec3(0.05, 0.046, 0.034) * (1.0 - cima);
+  vec3 H = normalize(uLightDir + V);
+  vec3 cor = alb * luz + solAgua * pow(max(dot(N, H), 0.0), 16.0) * brilho + ceuAgua * fres * 0.22;
+  vec4 nv = fogAt(distOlho, -V, vWorld.y);
   outColor = vec4(finish(mix(cor, nv.rgb, nv.a)), 1.0);
+}
+`;
+
+// ---- Colunas de bolhas (24/11/2026): cada fonte no chão solta bolhas que sobem até a superfície, bamboleando e
+// crescendo com a subida (a mesma conta do Abyssal Garden). Um quadradinho virado para quem olha por bolha.
+// iB0 = (x, y da fonte, z, fase) · iB1 = (velocidade de subida m/s, semente 1, semente 2, tamanho 0..1)
+const VS_BOLHAS = /* glsl */`
+precision highp float;
+in vec3 position;        // canto do quadrado em xy (−1..1)
+in vec4 iB0, iB1;
+uniform mat4 viewMatrix, projectionMatrix;
+uniform vec3 cameraPosition;
+uniform vec3 uWind;
+uniform float uTime, uPx;
+out vec2 vUv;
+out vec3 vWorld;
+out float vA;
+void main() {
+  float altura = max(${(MAR_NIVEL - 0.12).toFixed(2)} - iB0.y, 0.5);
+  float sobe = fract(uTime * iB1.x / altura + iB0.w);
+  float y = iB0.y + sobe * altura;
+  vec2 vai = vec2(sin(y * 0.9 + iB1.y * 30.0) + 0.5 * sin(y * 2.3 + iB1.z * 17.0), cos(y * 0.8 + iB1.z * 30.0) + 0.5 * sin(y * 2.0 + iB1.y * 11.0));
+  vec2 corrente = length(uWind.xy) > 1e-4 ? normalize(uWind.xy) : vec2(0.83, 0.55);
+  vec3 c = vec3(iB0.x, y, iB0.z) + vec3(vai.x, 0.0, vai.y) * (0.06 + 0.9 * sobe * iB1.y) + vec3(corrente.x, 0.0, corrente.y) * (sobe * 1.6);
+  float d = length(c - cameraPosition);
+  float tam = (0.028 + 0.085 * iB1.w * iB1.w) * (1.0 + 1.6 * sobe);
+  tam = max(tam, d * 1.3 / uPx);                                  // nunca menor que ~1,3 pixel: longe vira um ponto de luz
+  vA = smoothstep(0.0, 0.03, sobe) * (1.0 - smoothstep(0.93, 1.0, sobe)) * smoothstep(0.5, 2.2, d) * (1.0 - smoothstep(${(RAIO * 0.8).toFixed(1)}, ${(RAIO * 0.98).toFixed(1)}, d))
+     * step(cameraPosition.y, ${(MAR_NIVEL + 0.4).toFixed(2)});
+  vec3 dir = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]), cima = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
+  vec3 w = c + (dir * position.x + cima * position.y) * (tam * step(0.002, vA));
+  vUv = position.xy; vWorld = w;
+  gl_Position = projectionMatrix * viewMatrix * vec4(w, 1.0);
+}
+`;
+const FS_BOLHAS = /* glsl */`
+precision highp float;
+${COMMON}
+uniform vec3 cameraPosition;
+uniform vec3 uAguaCeu;
+${AGUA_GLSL}
+in vec2 vUv;
+in vec3 vWorld;
+in float vA;
+out vec4 outColor;
+void main() {
+  float r = length(vUv);
+  if (r > 1.0) discard;
+  // bolha: aro claro, um brilho forte do sol em cima e um reflexo fraco embaixo; o miolo é quase vazio
+  float aro = smoothstep(0.55, 0.88, r) * (1.0 - smoothstep(0.90, 1.0, r));
+  vec2 a = vUv - vec2(-0.35, 0.42), b = vUv - vec2(0.25, -0.5);
+  float alto = exp(-dot(a, a) * 22.0), baixo = exp(-dot(b, b) * 12.0) * 0.25;
+  float disco = 1.0 - smoothstep(0.90, 1.0, r);
+  float prof = max(${MAR_NIVEL.toFixed(2)} - vWorld.y, 0.0);
+  float dist = length(cameraPosition - vWorld);
+  vec3 luz = uSunColor * aguaSol(prof, uLightDir.y) * 0.55 + uAguaCeu * aguaCeu(prof) * 1.2;
+  vec3 cor = luz * vec3(0.80, 0.97, 1.0) * (aro * 0.55 + alto * 1.6 + baixo + disco * 0.05) * exp(-AGUA_EXT * dist) * vA;
+  outColor = vec4(finish(cor), vA * disco * 0.10);
 }
 `;
 
@@ -338,7 +445,7 @@ void main() {
   vec3 center = cameraPosition + rel;
   // Só desenha abaixo da superfície do mar e acima do fundo próximo
   float under = step(center.y, ${(MAR_NIVEL - 0.3).toFixed(2)}) * step(cameraPosition.y, ${(MAR_NIVEL + 6.0).toFixed(2)});
-  float r = isBubble > 0.5 ? (0.026 + 0.034 * ph) : (0.015 + 0.018 * ph);
+  float r = isBubble > 0.5 ? (0.04 + 0.055 * ph) : (0.015 + 0.018 * ph);
   float distFade = 1.0 - smoothstep(11.0, 16.5, length(rel));
   vec3 w = center + position * (r * under * distFade);
   vWorld = w; vN = normal; vKind = vec2(isBubble, ph);
@@ -370,9 +477,10 @@ void main() {
 
 export function initRecife({ scene, camera, game }) {
   const pc = game.plataforma === 'pc' || !game.plataforma;
-  const raio = pc ? RAIO : RAIO * 0.6;
+  const raio = pc ? RAIO : RAIO * 0.42;
   // modelos (perto = nível 0, longe = nível 2), um lote de instâncias por tipo e nível
-  const mat = new THREE.RawShaderMaterial({ name: 'recife', glslVersion: THREE.GLSL3, uniforms: { ...U }, vertexShader: VS, fragmentShader: FS, side: THREE.DoubleSide });
+  const mat = new THREE.RawShaderMaterial({ name: 'recife', glslVersion: THREE.GLSL3, vertexShader: VS, fragmentShader: FS, side: THREE.DoubleSide });
+  mat.uniforms = U;
   const lotes = new Map();   // "tipo:nivel" -> { g, m, max, n }
   const geoCache = new Map();
   function lote(tipo, nivel) {
@@ -395,11 +503,12 @@ export function initRecife({ scene, camera, game }) {
     lotes.set(k, l);
     return l;
   }
-  // zona de um ponto do fundo: [crista, frente, trás, manchas, talude] (pesos)
+  // zona de um ponto do fundo: [crista, frente, trás, manchas, talude, fundo] (pesos)
   function zona(prof, s) {
     if (prof < 1.0 || s < 4) return null;
-    if (prof > 19) return null;
-    const z = [0, 0, 0, 0, 0];
+    if (prof > FUNDO_ATE) return null;
+    const z = [0, 0, 0, 0, 0, 0];
+    if (prof > FUNDO_DE) { z[5] = 1; return z; }
     if (prof < 3.8 && s > 14 && s < 46) z[0] = 1;
     else if (prof < 4 && s <= 14) z[2] = 1;
     else if (prof < 10) z[1] = 1;
@@ -419,25 +528,36 @@ export function initRecife({ scene, camera, game }) {
       for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
         const x = cx * CEL + (i + rnd()) * L.spacing, z = cz * CEL + (j + rnd()) * L.spacing;
         const s = arq.s(x, z);
-        if (s < 3 || s > 160 || arq.p(x, z) > 0) { rnd(); rnd(); continue; }
+        if (s < 3 || arq.p(x, z) > 0) { rnd(); rnd(); continue; }
         const topo = gen.height(Math.floor(x), Math.floor(z)) + 1, prof = MAR_NIVEL - topo;
+        if (s > 160 && prof <= FUNDO_DE) { rnd(); rnd(); continue; }      // raso longe da costa (banco de areia): fica limpo
         const zn = zona(prof, s);
         if (!zn) { rnd(); continue; }
+        const zi = zn.indexOf(1), fundo = zi === 5;
         // manchas de recife e canais de areia (a estrutura só onde a mancha é forte)
         const F = vnoise(x * 0.045, z * 0.045, seed ^ 0x2468) * 0.65 + vnoise(x * 0.13, z * 0.13, seed ^ 0x1357) * 0.35;
-        if (L.sand ? F > 0.62 : F < 0.38 + L.allow * 0.5) { rnd(); continue; }
-        // sorteio do tipo pela abundância na zona
-        const zi = zn.indexOf(1);
-        let tot = 0; for (const t in L.types) tot += L.types[t][zi];
+        let floresta = 0;
+        if (fundo) {
+          // no fundo a vida vem em manchas largas: jardins de 60 a 100 m separados por areia, e florestas de alga
+          const jardim = vnoise(x * 0.012, z * 0.012, seed ^ 0x6a7d) * 0.7 + vnoise(x * 0.031, z * 0.031, seed ^ 0x33c1) * 0.3;
+          floresta = vnoise(x * 0.017 + 9.3, z * 0.017 - 4.1, seed ^ 0x5eaf);
+          if (jardim < 0.43 && floresta < 0.6) { rnd(); continue; }
+          if (L.sand ? F > 0.7 : F < 0.3 + L.allow * 0.4) { rnd(); continue; }
+        } else if (L.sand ? F > 0.62 : F < 0.38 + L.allow * 0.5) { rnd(); continue; }
+        // sorteio do tipo pela abundância na zona (no fundo, a tabela FUNDO; a alga gigante quase só nas florestas)
+        const tabela = fundo ? FUNDO[li] : L.types;
+        const peso = (t) => (fundo ? tabela[t] * (t === 'kelp' ? (floresta > 0.6 ? 9 : 0.12) : (floresta > 0.6 ? 0.45 : 1)) : tabela[t][zi]);
+        let tot = 0; for (const t in tabela) tot += peso(t);
         if (tot <= 0) { rnd(); continue; }
-        let r = rnd() * tot * (L.sand ? 4 : 1.25), tipo = null;   // parte das vagas fica vazia (respiro)
-        for (const t in L.types) { r -= L.types[t][zi]; if (r <= 0) { tipo = t; break; } }
+        let r = rnd() * tot * (L.sand ? 4 : fundo ? 2.2 : 1.25), tipo = null;   // parte das vagas fica vazia (respiro; no fundo, mais)
+        for (const t in tabela) { r -= peso(t); if (r <= 0) { tipo = t; break; } }
         if (!tipo) continue;
         const T = TYPES[tipo];
         if (tipo === 'kelp' && prof < 4.2) continue;
         if (tipo === 'arch' && prof < 5.5) continue;
         let esc = T.scale[0] + (T.scale[1] - T.scale[0]) * Math.pow(rnd(), 1.6);
         const sy = T.sy[0] + (T.sy[1] - T.sy[0]) * rnd(), sxz = T.sxz[0] + (T.sxz[1] - T.sxz[0]) * rnd();
+        if (tipo === 'kelp' && fundo) esc *= 1.55;                // no fundo a alga é gigante de verdade (até ~20 m)
         if (tipo === 'kelp') esc = Math.min(esc, Math.max(2.2, (prof - 0.75) / sy));
         if (tipo === 'arch') esc = Math.min(esc, Math.max(2.6, (prof - 1.1) / (sy * 1.2)));
         // alinhado entre o vertical e a inclinação do fundo
@@ -458,12 +578,12 @@ export function initRecife({ scene, camera, game }) {
       const rndS = rngDe(hSet);
       const sx = cx * CEL + (0.25 + rndS() * 0.5) * CEL, sz = cz * CEL + (0.25 + rndS() * 0.5) * CEL;
       const ss = arq.s(sx, sz);
-      if (ss >= 14 && ss <= 145 && arq.p(sx, sz) <= 0) {
+      if (ss >= 14 && arq.p(sx, sz) <= 0) {
         const topoS = gen.height(Math.floor(sx), Math.floor(sz)) + 1, profS = MAR_NIVEL - topoS;
-        if (profS >= 6.8 && profS <= 18.5) {
+        if (profS >= 6.8 && profS <= FUNDO_ATE && (ss <= 145 || profS > FUNDO_DE)) {
           const piece = (hSet >>> 5) % 3 === 0 ? 'shipHull' : (hSet >>> 5) % 3 === 1 ? 'whaleFluke' : 'arch';
           const TS = TYPES[piece];
-          const escS = Math.min(TS.scale[0] + (TS.scale[1] - TS.scale[0]) * rndS(), Math.max(3.2, profS - 1.4));
+          const escS = Math.min((TS.scale[0] + (TS.scale[1] - TS.scale[0]) * rndS()) * (profS > FUNDO_DE ? 1.5 : 1), Math.max(3.2, profS - 1.4));
           const qS = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rndS() * Math.PI * 2);
           c.push({
             tipo: piece, x: sx, y: topoS - TS.sink * escS - 0.12, z: sz,
@@ -479,8 +599,10 @@ export function initRecife({ scene, camera, game }) {
   }
 
   // ---- Malhas instanciadas de Arraias-Manta, Cardumes de Peixes e Partículas Submersas (Zero GC por frame) ----------
-  const matFauna = new THREE.RawShaderMaterial({ name: 'recife-fauna-mar', glslVersion: THREE.GLSL3, uniforms: { ...U }, vertexShader: VS_FAUNA_MAR, fragmentShader: FS_FAUNA_MAR, side: THREE.DoubleSide });
-  const matPart = new THREE.RawShaderMaterial({ name: 'recife-particulas-mar', glslVersion: THREE.GLSL3, uniforms: { ...U }, vertexShader: VS_PARTICULAS_MAR, fragmentShader: FS_PARTICULAS_MAR });
+  const matFauna = new THREE.RawShaderMaterial({ name: 'recife-fauna-mar', glslVersion: THREE.GLSL3, vertexShader: VS_FAUNA_MAR, fragmentShader: FS_FAUNA_MAR, side: THREE.DoubleSide });
+  matFauna.uniforms = U;
+  const matPart = new THREE.RawShaderMaterial({ name: 'recife-particulas-mar', glslVersion: THREE.GLSL3, vertexShader: VS_PARTICULAS_MAR, fragmentShader: FS_PARTICULAS_MAR });
+  matPart.uniforms = U;
 
   function criarLoteFauna(baseGeo, max, name) {
     const g = new THREE.InstancedBufferGeometry();
@@ -488,13 +610,41 @@ export function initRecife({ scene, camera, game }) {
     g.setIndex(baseGeo.index);
     g.setAttribute('iOrbit', new THREE.InstancedBufferAttribute(new Float32Array(max * 4), 4));
     g.setAttribute('iColor', new THREE.InstancedBufferAttribute(new Float32Array(max * 4), 4));
+    g.setAttribute('iExtra', new THREE.InstancedBufferAttribute(new Float32Array(max * 4), 4));
     g.instanceCount = 0;
     const m = new THREE.Mesh(g, matFauna); m.frustumCulled = false; m.visible = false; m.name = name;
     scene.add(m);
     return { g, m, max, n: 0 };
   }
-  const loteMantas = criarLoteFauna(Geo.createMantaRay(pc ? 0 : 1), 48, 'recife-arraias-manta');
-  const lotePeixes = criarLoteFauna(Geo.createReefFish(pc ? 0 : 1), 640, 'recife-cardumes');
+  // um bicho no lote: centro e raio da volta, cor, fase (+100 = arraia), segundo raio, sobe-e-desce, espalhamento, semente
+  function poe(lf, x, y, z, R, cor, fase, R2, ya, esp, sem) {
+    if (lf.n >= lf.max) return false;
+    const k = lf.n * 4, o = lf.g.attributes.iOrbit.array, c = lf.g.attributes.iColor.array, e = lf.g.attributes.iExtra.array;
+    o[k] = x; o[k + 1] = y; o[k + 2] = z; o[k + 3] = R;
+    c[k] = cor[0]; c[k + 1] = cor[1]; c[k + 2] = cor[2]; c[k + 3] = fase;
+    e[k] = R2; e[k + 1] = ya; e[k + 2] = esp; e[k + 3] = sem;
+    lf.n++;
+    return true;
+  }
+  const loteMantas = criarLoteFauna(Geo.createMantaRay(pc ? 0 : 1), pc ? 72 : 24, 'recife-arraias-manta');
+  const lotePeixes = criarLoteFauna(Geo.createReefFish(pc ? 0 : 1), pc ? 1500 : 320, 'recife-cardumes');            // cardumes perto de quem olha
+  const lotePeixesLonge = criarLoteFauna(Geo.createReefFish(1), pc ? 5200 : 700, 'recife-cardumes-longe');            // os de longe: peixe de 40 triângulos
+
+  // colunas de bolhas: um quadradinho por bolha, tudo na placa (VS_BOLHAS)
+  const maxBolhas = pc ? 3600 : 520;
+  const gBolhas = new THREE.InstancedBufferGeometry();
+  gBolhas.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0]), 3));
+  gBolhas.setIndex([0, 1, 2, 0, 2, 3]);
+  gBolhas.setAttribute('iB0', new THREE.InstancedBufferAttribute(new Float32Array(maxBolhas * 4), 4));
+  gBolhas.setAttribute('iB1', new THREE.InstancedBufferAttribute(new Float32Array(maxBolhas * 4), 4));
+  gBolhas.instanceCount = 0;
+  const matBolhas = new THREE.RawShaderMaterial({ name: 'recife-bolhas', glslVersion: THREE.GLSL3, vertexShader: VS_BOLHAS, fragmentShader: FS_BOLHAS,
+    transparent: true, depthWrite: false, blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor, blendSrcAlpha: THREE.ZeroFactor, blendDstAlpha: THREE.OneFactor });
+  matBolhas.uniforms = { ...U, uPx: { value: 900 } };
+  const meshBolhas = new THREE.Mesh(gBolhas, matBolhas);
+  meshBolhas.frustumCulled = false; meshBolhas.visible = false; meshBolhas.renderOrder = 4; meshBolhas.name = 'recife-bolhas';
+  scene.add(meshBolhas);
+  let nBolhas = 0;
 
   // Partículas submersas pré-alocadas 1 única vez (bolhas subindo + plâncton verde/ouro flutuando)
   const nPart = pc ? 960 : 420;
@@ -527,7 +677,8 @@ export function initRecife({ scene, camera, game }) {
   function refazer(px, pz) {
     faltou = false;
     for (const l of lotes.values()) l.n = 0;
-    loteMantas.n = 0; lotePeixes.n = 0;
+    loteMantas.n = 0; lotePeixes.n = 0; lotePeixesLonge.n = 0;
+    const fontes = [];                              // fontes de bolhas à vista: [x, y, z, quantas, semente]
     const gen = game.gen, arq = gen.arq, seed = gen.seed >>> 0;
     const c0x = Math.floor((px - raio) / CEL), c1x = Math.floor((px + raio) / CEL), c0z = Math.floor((pz - raio) / CEL), c1z = Math.floor((pz + raio) / CEL);
     for (let cz = c0z; cz <= c1z; cz++) for (let cx = c0x; cx <= c1x; cx++) {
@@ -536,7 +687,7 @@ export function initRecife({ scene, camera, game }) {
       for (const o of lista) {
         const d = Math.hypot(o.x - px, o.z - pz);
         if (d > raio) continue;
-        const nivel = d < PERTO * Math.max(1, o.esc) ? 0 : 2;
+        const nivel = d < Math.min(PERTO_MAX, PERTO * Math.max(1, o.esc)) ? 0 : 2;
         const l = lote(o.tipo, nivel);
         if (l.n >= l.max) continue;
         const k = l.n * 4, T = TYPES[o.tipo];
@@ -548,69 +699,107 @@ export function initRecife({ scene, camera, game }) {
         c2Arr[k] = o.c2[0]; c2Arr[k + 1] = o.c2[1]; c2Arr[k + 2] = o.c2[2]; c2Arr[k + 3] = T.s;
         l.n++;
       }
-      // Cardumes e Arraias-Manta determinísticos por célula de recife com água suficiente
-      if (lista.length > 2) {
-        const hF = hash32(cx, cz, seed ^ 0x517cc1b7);
-        const mx = (cx + 0.5) * CEL, mz = (cz + 0.5) * CEL;
-        if (Math.hypot(mx - px, mz - pz) <= raio) {
-          const topoF = gen.height(Math.floor(mx), Math.floor(mz)) + 1, profF = MAR_NIVEL - topoF;
-          if (profF >= 4.2 && arq.s(mx, mz) >= 8) {
-            const rndF = rngDe(hF);
-            // Arraia-manta planar nas águas médias/fundas
-            if (profF >= 5.5 && (hF % 3) === 0 && loteMantas.n < loteMantas.max) {
-              const mk = loteMantas.n * 4;
-              const oA = loteMantas.g.attributes.iOrbit.array, cA = loteMantas.g.attributes.iColor.array;
-              const mY = topoF + Math.min(profF * 0.58, profF - 1.6);
-              const mR = (4.5 + rndF() * 4.5) * (rndF() < 0.5 ? 1 : -1);
-              oA[mk] = mx; oA[mk + 1] = mY; oA[mk + 2] = mz; oA[mk + 3] = mR;
-              cA[mk] = 0.16; cA[mk + 1] = 0.24; cA[mk + 2] = 0.36; cA[mk + 3] = 100.0 + rndF();
-              loteMantas.n++;
-            }
-            // Cardume coeso (8 a 14 peixes orbitando o recife da célula)
-            if ((hF % 2) === 0 && lotePeixes.n + 14 <= lotePeixes.max) {
-              const pal = FISH_PAL[(hF >>> 4) % FISH_PAL.length];
-              const count = 8 + (hF % 7);
-              const baseY = topoF + 1.2 + rndF() * Math.max(0.8, profF - 2.6);
-              const baseR = (2.2 + rndF() * 2.8) * (rndF() < 0.5 ? 1 : -1);
-              const basePhase = rndF();
-              const oA = lotePeixes.g.attributes.iOrbit.array, cA = lotePeixes.g.attributes.iColor.array;
-              for (let f = 0; f < count; f++) {
-                const fk = lotePeixes.n * 4;
-                oA[fk] = mx + (rndF() - 0.5) * 1.8;
-                oA[fk + 1] = Math.min(MAR_NIVEL - 0.9, Math.max(topoF + 0.7, baseY + (rndF() - 0.5) * 1.1));
-                oA[fk + 2] = mz + (rndF() - 0.5) * 1.8;
-                oA[fk + 3] = baseR + (rndF() - 0.5) * 0.55;
-                cA[fk] = pal[0]; cA[fk + 1] = pal[1]; cA[fk + 2] = pal[2];
-                cA[fk + 3] = (basePhase + f * 0.045 + rndF() * 0.02) % 1;
-                lotePeixes.n++;
-              }
-            }
+      // peça com fonte de bolhas própria: o casco naufragado solta ar preso
+      for (const o of lista) if (o.tipo === 'shipHull' && Math.hypot(o.x - px, o.z - pz) <= raio) fontes.push([o.x, o.y + 0.6, o.z, 30, hash32(cx, cz, 911)]);
+    }
+    // ---- Cardumes e arraias (24/11/2026): um cardume por célula larga de 32 m em 7 de cada 10 células, em qualquer
+    // fundura a partir de 4 m — inclusive no mar aberto e sobre o fundo de 30 a 40 m. O cardume inteiro dá uma volta larga
+    // e torta em bloco (VS_FAUNA_MAR); os de perto usam o peixe detalhado, os de longe o simples.
+    {
+      const q0x = Math.floor((px - raio - 16) / CARDUME_CEL), q1x = Math.floor((px + raio + 16) / CARDUME_CEL);
+      const q0z = Math.floor((pz - raio - 16) / CARDUME_CEL), q1z = Math.floor((pz + raio + 16) / CARDUME_CEL);
+      for (let qz = q0z; qz <= q1z; qz++) for (let qx = q0x; qx <= q1x; qx++) {
+        const hF = hash32(qx, qz, seed ^ 0x517cc1b7), rndF = rngDe(hF);
+        const mx = (qx + 0.2 + rndF() * 0.6) * CARDUME_CEL, mz = (qz + 0.2 + rndF() * 0.6) * CARDUME_CEL;
+        const d = Math.hypot(mx - px, mz - pz);
+        if (d > raio + 14 || arq.s(mx, mz) < 8) continue;
+        const alt = (x, z) => gen.height(Math.floor(x), Math.floor(z)) + 1;
+        const topoC = alt(mx, mz), profF = MAR_NIVEL - topoC;
+        if (profF < 4.2 || profF > FUNDO_ATE) continue;
+        let R = 5 + rndF() * 9;
+        // o chão mais alto por onde a volta passa: o cardume nada acima dele
+        const topoF = Math.max(topoC, alt(mx + R, mz), alt(mx - R, mz), alt(mx, mz + R), alt(mx, mz - R));
+        const livre = MAR_NIVEL - topoF - 3.0;                  // água onde o cardume cabe, com folga do chão e da superfície
+        if (livre < 1.2) continue;
+        const sentido = rndF() < 0.5 ? 1 : -1;
+        // Arraia-manta planando: no raso perto do recife e no mar aberto, às vezes em par
+        if (profF >= 5.5 && (hF % 3) === 0) {
+          const Rm = Math.min(7 + rndF() * 9, 16), ym = topoF + 1.8 + Math.min(livre * 0.62, 18);
+          const n = rndF() < 0.35 ? 2 : 1, f0 = rndF();
+          for (let k = 0; k < n; k++) poe(loteMantas, mx, ym + k * 1.4, mz, Rm * sentido, [0.16, 0.24, 0.36], 100.0 + (f0 + k * 0.045) % 1, Rm * 0.3, Math.min(1.8, livre * 0.1), 0, rndF());
+        }
+        if ((hF % 10) < 7) {
+          const pal = FISH_PAL[(hF >>> 4) % FISH_PAL.length];
+          const cheio = pc ? 46 + Math.floor(rndF() * rndF() * 210) : 14 + Math.floor(rndF() * 34);
+          const ya = Math.min(2.6, livre * 0.2);
+          const cy = topoF + 1.6 + ya + rndF() * Math.max(0.4, Math.min(livre - 2 * ya - 0.6, 16));
+          // classe de tamanho: recife raso = miúdos; mar aberto e fundo = também médios e grandes (em cardumes menores)
+          const classe = profF < 9 ? (rndF() < 0.75 ? 0 : 1) : Math.min(3, Math.floor(rndF() * rndF() * 4.2));
+          const R2 = R * (0.22 + rndF() * 0.2), esp = Math.min(9.5, Math.min(1.5 + rndF() * 2.4 + cheio * 0.008 + classe * 0.9, Math.max(1.2, livre * 0.8))) + classe * 10;
+          const fase0 = rndF();
+          const quantos = Math.max(8, Math.round(cheio / (1 + classe * 0.9)));
+          const lf = d - R < 24 ? lotePeixes : lotePeixesLonge;
+          for (let f = 0; f < quantos; f++) {
+            const fase = (fase0 + (rndF() - 0.5) * 0.07 + 1) % 1;
+            if (!poe(lf, mx, cy, mz, R * sentido, pal, fase, R2, ya, esp, rndF()) && !poe(lf === lotePeixes ? lotePeixesLonge : lotePeixes, mx, cy, mz, R * sentido, pal, fase, R2, ya, esp, rndF())) break;
           }
         }
       }
+    }
+    // ---- Fontes de bolhas: 1 em cada 3 células de 24 m tem uma; a coluna sobe do chão até a superfície ----
+    {
+      nBolhas = 0;
+      const b0 = gBolhas.attributes.iB0.array, b1 = gBolhas.attributes.iB1.array;
+      const f0x = Math.floor((px - raio) / FONTE_CEL), f1x = Math.floor((px + raio) / FONTE_CEL), f0z = Math.floor((pz - raio) / FONTE_CEL), f1z = Math.floor((pz + raio) / FONTE_CEL);
+      for (let fz = f0z; fz <= f1z; fz++) for (let fx = f0x; fx <= f1x; fx++) {
+        const h = hash32(fx, fz, seed ^ 0x0b01ba5);
+        if ((h % 100) >= 46) continue;
+        const r = rngDe(h), x = (fx + 0.15 + r() * 0.7) * FONTE_CEL, z = (fz + 0.15 + r() * 0.7) * FONTE_CEL;
+        if (Math.hypot(x - px, z - pz) > raio || arq.s(x, z) < 6 || arq.p(x, z) > 0) continue;
+        const topo = gen.height(Math.floor(x), Math.floor(z)) + 1, prof = MAR_NIVEL - topo;
+        if (prof < 2.5 || prof > FUNDO_ATE) continue;
+        fontes.push([x, topo + 0.08, z, (pc ? 34 : 10) + Math.floor(r() * (pc ? 50 : 14)), h]);
+      }
+      for (const [x, y, z, n, h] of fontes) {
+        const r = rngDe(h ^ 0x7f4a7c15);
+        for (let k = 0; k < n && nBolhas < maxBolhas; k++) {
+          const i = nBolhas * 4;
+          b0[i] = x + (r() - 0.5) * 0.5; b0[i + 1] = y; b0[i + 2] = z + (r() - 0.5) * 0.5; b0[i + 3] = r();
+          b1[i] = 0.9 + r() * 1.3; b1[i + 1] = r(); b1[i + 2] = r(); b1[i + 3] = r();
+          nBolhas++;
+        }
+      }
+      gBolhas.instanceCount = nBolhas;
+      gBolhas.attributes.iB0.needsUpdate = true; gBolhas.attributes.iB1.needsUpdate = true;
     }
     for (const l of lotes.values()) {
       l.g.instanceCount = l.n; l.m.visible = l.n > 0;
       for (const a of ['iA', 'iQ', 'iB', 'iC1', 'iC2']) l.g.attributes[a].needsUpdate = true;
     }
-    for (const lf of [loteMantas, lotePeixes]) {
+    for (const lf of [loteMantas, lotePeixes, lotePeixesLonge]) {
       lf.g.instanceCount = lf.n; lf.m.visible = lf.n > 0;
       lf.g.attributes.iOrbit.needsUpdate = true;
       lf.g.attributes.iColor.needsUpdate = true;
+      lf.g.attributes.iExtra.needsUpdate = true;
     }
   }
   game.hooks.frame.push(() => {
     const on = !!(game.gen && game.gen.arq && game.dim === 0);
     if (!on) {
       for (const l of lotes.values()) l.m.visible = false;
-      loteMantas.m.visible = false; lotePeixes.m.visible = false; meshPart.visible = false;
+      loteMantas.m.visible = false; lotePeixes.m.visible = false; lotePeixesLonge.m.visible = false; meshPart.visible = false; meshBolhas.visible = false;
       return;
     }
     camera.getWorldPosition(tmp);
     meshPart.visible = tmp.y < MAR_NIVEL + 5.5 && (lotePeixes.n > 0 || lotes.size > 0);
+    meshBolhas.visible = nBolhas > 0 && tmp.y < MAR_NIVEL + 0.4;
+    // pixels por radiano (para a bolha de longe nunca ficar menor que um ponto)
+    matBolhas.uniforms.uPx.value = (globalThis.LAVRA?.renderer?.domElement?.height || 900) / (2 * Math.tan((camera.fov || 72) * Math.PI / 360));
     if (genUsado !== game.gen) { genUsado = game.gen; celulas.clear(); ultimo = null; }
     orcamento = 3;                                  // células novas por quadro (geração em parcelas)
     if (!ultimo || faltou || Math.hypot(tmp.x - ultimo[0], tmp.z - ultimo[1]) > 5) { ultimo = [tmp.x, tmp.z]; refazer(tmp.x, tmp.z); }
   });
-  game.recife = { lotes, celulas, loteMantas, lotePeixes, meshPart };
+  game.recife = { lotes, celulas, loteMantas, lotePeixes, lotePeixesLonge, meshPart, meshBolhas,
+    // contagem do que está à vista agora (para a sonda e para quem quiser mostrar)
+    get stats() { let o = 0; for (const l of lotes.values()) o += l.n; return { organismos: o, peixes: lotePeixes.n + lotePeixesLonge.n, arraias: loteMantas.n, bolhas: nBolhas, celulas: celulas.size }; } };
 }

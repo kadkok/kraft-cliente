@@ -3,6 +3,7 @@
 // src/ocean/UnderwaterLighting.js, MIT License — Copyright (c) Dan Greenheck).
 
 import { SEA } from '../../shared/constants.js';
+import { AGUA, AGUA_GLSL, luzDoDia, luzNaFundura } from './agua-clara.js';
 import { LEVEL } from '../../shared/blocks.js';
 import {
   NIVEL_MAR_REPOUSO,
@@ -132,69 +133,26 @@ export function avaliarSuperficieCamera(camPos, time = 0, wind = PADRAO_VENTO, s
 // Em águas rasas predomina o turquesa brilhante (verde+azul); em águas profundas o verde decai antes
 // do azul e a cor migra para azul oceânico escuro.
 export function corNevoaSubmarina(camDepth = 0, lightDir = { x: 0, y: 1, z: 0 }, sunColor = { x: 1, y: 1, z: 1 }, ambSky = { x: 0.3, y: 0.4, z: 0.6 }, dayK = 1) {
+  // Água clara (render/agua-clara.js, 24/11/2026): a cor da névoa é o véu que a água devolve a quem olha na horizontal,
+  // na fundura em que está; a luz que chega a essa fundura (sol e difusa) vale para os materiais padrão do three.
   const zc = Math.max(0, Number.isFinite(camDepth) ? camDepth : 0);
-  const sigA = WATER_ABSORPTION;
-  const sigS = WATER_SCATTERING;
-  const sigT = [sigA[0] + sigS[0], sigA[1] + sigS[1], sigA[2] + sigS[2]];
-
-  // Direção do sol refratada na água (lei de Snell, IOR = 1.333)
   const ly = Math.max(-1, Math.min(1, Number.isFinite(lightDir?.y) ? lightDir.y : 0.8));
-  const sinAir = Math.sqrt(Math.max(0, 1 - ly * ly));
-  const sinWater = sinAir / UW_IOR;
-  const mu = Math.max(0.18, Math.sqrt(Math.max(0, 1 - sinWater * sinWater)));
-
-  // Atenuação da luz solar e celeste até a profundidade zc (UnderwaterLighting.js)
-  const attSun = [
-    Math.exp(-sigT[0] * zc / mu),
-    Math.exp(-sigT[1] * zc / mu),
-    Math.exp(-sigT[2] * zc / mu),
-  ];
-  const attAmb = [
-    Math.exp(-sigT[0] * zc * 1.15) * 0.88,
-    Math.exp(-sigT[1] * zc * 1.15) * 0.92 + 0.025 * Math.exp(-zc * 0.08),
-    Math.exp(-sigT[2] * zc * 1.15) * 0.95 + 0.055 * Math.exp(-zc * 0.07),
-  ];
-
-  // Albedo de espalhamento simples + múltiplo na coluna d'água
-  const alb = [
-    sigS[0] / sigT[0],
-    sigS[1] / sigT[1],
-    sigS[2] / sigT[2],
-  ];
-
-  const sx = Number.isFinite(sunColor?.x) ? sunColor.x : 1;
-  const sy = Number.isFinite(sunColor?.y) ? sunColor.y : 1;
-  const sz = Number.isFinite(sunColor?.z) ? sunColor.z : 1;
-  const ax = Number.isFinite(ambSky?.x) ? ambSky.x : 0.3;
-  const ay = Number.isFinite(ambSky?.y) ? ambSky.y : 0.4;
-  const az = Number.isFinite(ambSky?.z) ? ambSky.z : 0.6;
-  const dk = Math.max(0.15, Math.min(1, Number.isFinite(dayK) ? dayK : 1));
-
-  // Transição turquesa raso -> azul profundo conforme zc aumenta
-  const deepK = 1 - Math.exp(-zc * 0.11);
-  const shallowTurquoise = [0.025 * dk, 0.24 * dk, 0.30 * dk];
-  const deepOceanBlue = [0.004 * dk, 0.032 * dk, 0.105 * dk];
-
-  const scatterR = (sx * 0.26 * attSun[0] + ax * 1.65 * attAmb[0]) * alb[0] * 1.4;
-  const scatterG = (sy * 0.32 * attSun[1] + ay * 1.95 * attAmb[1]) * alb[1] * 2.35;
-  const scatterB = (sz * 0.34 * attSun[2] + az * 2.15 * attAmb[2]) * alb[2] * 2.65;
-
-  const baseR = shallowTurquoise[0] * (1 - deepK) + deepOceanBlue[0] * deepK;
-  const baseG = shallowTurquoise[1] * (1 - deepK) + deepOceanBlue[1] * deepK;
-  const baseB = shallowTurquoise[2] * (1 - deepK) + deepOceanBlue[2] * deepK;
-
+  const luz = luzNaFundura(zc, ly);
+  const dia = luzDoDia(sunColor, ambSky, ly);       // (dayK ficou na assinatura por quem já chamava; a luz do dia já vem nos uniforms)
+  // véu = luz difusa devolvida + sol direto espalhado (fase média 0,7, olhando para os lados)
+  const sol = [sunColor?.x ?? 1, sunColor?.y ?? 1, sunColor?.z ?? 1], alto = Math.max(0, Math.min(1, ly * 4));
+  const veu = AGUA.veu.map((v, i) => (v * dia * luz.ceu[i] + AGUA.veuSol[i] * sol[i] * alto * 0.7 * luz.sol[i]) * AGUA.veuGanho / AGUA.ext[i]);
   return {
-    r: scatterR * 0.65 + baseR * 0.75,
-    g: scatterG * 0.65 + baseG * 0.85,
-    b: scatterB * 0.65 + baseB * 0.95,
-    attSun,
-    attAmb,
-    deepK,
+    r: veu[0], g: veu[1], b: veu[2],
+    attSun: luz.sol,
+    attAmb: luz.ceu,
+    deepK: 1 - Math.exp(-zc * 0.11),
   };
 }
 
 // Funções GLSL 300 es compartilhadas entre o passe de god-rays/cáusticas (UW_SHAFTS_FS) e o composite final
 export const UW_COMMON_GLSL = /* glsl */`
+${AGUA_GLSL}
 const float UW_IOR = 1.333;
 const float UW_STRADDLE = 0.44;
 const int UW_BAND = 12;
@@ -333,9 +291,12 @@ float causticsSampleShaft(vec3 P, float depth) {
 export const UW_SHAFTS_FS = /* glsl */`
 precision highp float;
 uniform sampler2D tDepth;
+uniform sampler2D tCaust;
 uniform vec3 uLightDir;
 uniform vec3 uSunColor;
 uniform vec3 uAmbSky;
+uniform vec3 uAguaVeuSol;
+uniform float uAguaTurva;
 uniform vec3 uWind;
 uniform float uTime;
 ${UW_COMMON_GLSL}
@@ -358,33 +319,58 @@ void main() {
   float zc = max(uWaterY - uCamPos.y, 0.0);
   float waterDist = dir.y > 0.002 ? min(dist, max(zc, 0.25) / dir.y) : dist;
 
-  vec3 Ls = -refract(-uLightDir, vec3(0.0, 1.0, 0.0), 1.0 / UW_IOR);
-  float mu = max(Ls.y, 0.18);
-  float cosPh = dot(dir, Ls);
-  float g = 0.85;
-  float phase = (1.0 - g * g) / (4.0 * UW_PI) / pow(max(1.0 + g * g - cosPh * 2.0 * g, 1e-4), 1.5) * 0.75 + 0.25 / (4.0 * UW_PI);
-
-  vec3 sunE = uSunColor * 0.96 + uAmbSky * 0.35;
   vec3 shafts = vec3(0.0);
+  float jitter = uwIgn(gl_FragCoord.xy + fract(uTime * 1.37) * 64.0);
 
-  const int STEPS = 16;
-  float maxD = min(waterDist, 22.0);
-  if (maxD > 0.02) {
-    float ds = maxD / float(STEPS);
-    float jitter = uwIgn(gl_FragCoord.xy + fract(uTime * 1.37) * 64.0);
-    for (int i = 0; i < STEPS; i++) {
-      float s = (float(i) + jitter) * ds;
-      vec3 p = uCamPos + dir * s;
-      float surfH = uBaseSea + uwWaveFast(p.xz);
-      float z = surfH - p.y;
-      if (z <= 0.0) continue;
-      float caus = causticsSampleShaft(p, z);
-      vec3 Tl = exp(-UW_SIG_T * (s + z / mu));
-      shafts += max(caus - 0.82, 0.0) * Tl * ds;
+  if (uAguaTurva < 0.5) {
+    // Água clara do mar (Abyssal Garden fsVol): passos esticados até 80 m lendo o mapa refrativo tCaust
+    const int STEPS_CLARA = 20;
+    float maxD = min(waterDist, 80.0);
+    if (maxD > 0.05 && uLightDir.y > 0.01) {
+      float tp = 0.0;
+      float ly = max(uLightDir.y, 0.25);
+      for (int i = 0; i < STEPS_CLARA; i++) {
+        float t1 = maxD * pow((float(i) + 1.0) / float(STEPS_CLARA), 1.55);
+        float dt = t1 - tp;
+        float s = tp + dt * jitter;
+        tp = t1;
+        vec3 p = uCamPos + dir * s;
+        float z = uBaseSea - p.y;
+        if (z <= 0.0) continue;
+        vec2 q = p.xz + uLightDir.xz * (z / ly);
+        vec2 qr = vec2(q.x * 0.453596 + q.y * 0.891207, -q.x * 0.891207 + q.y * 0.453596);
+        float c1 = textureLod(tCaust, q / 37.0, 2.0).r;
+        float c2 = textureLod(tCaust, qr / 61.0 + vec2(0.31), 2.0).r;
+        float excess = max(min(c1 * c2, 5.0) - 0.85, 0.0) * exp(-z * 0.012);
+        shafts += exp(-AGUA_EXT * s) * aguaSol(z, uLightDir.y) * (excess * dt);
+      }
+      float upRay = 1.15 + 1.15 * smoothstep(-0.1, 0.75, dir.y);
+      shafts *= uAguaVeuSol * aguaFase(dot(dir, uLightDir)) * upRay;
     }
-    // Reforço direcional dos god rays quando olhando para cima / direção do sol refratado
-    float upRay = 1.0 + 1.35 * smoothstep(-0.1, 0.75, dir.y);
-    shafts *= sunE * UW_SIG_S * (phase * 1.4 + 0.055) * 3.4 * upRay;
+  } else {
+    vec3 Ls = -refract(-uLightDir, vec3(0.0, 1.0, 0.0), 1.0 / UW_IOR);
+    float mu = max(Ls.y, 0.18);
+    float cosPh = dot(dir, Ls);
+    float g = 0.85;
+    float phase = (1.0 - g * g) / (4.0 * UW_PI) / pow(max(1.0 + g * g - cosPh * 2.0 * g, 1e-4), 1.5) * 0.75 + 0.25 / (4.0 * UW_PI);
+    vec3 sunE = uSunColor * 0.96 + uAmbSky * 0.35;
+    const int STEPS = 16;
+    float maxD = min(waterDist, 22.0);
+    if (maxD > 0.02) {
+      float ds = maxD / float(STEPS);
+      for (int i = 0; i < STEPS; i++) {
+        float s = (float(i) + jitter) * ds;
+        vec3 p = uCamPos + dir * s;
+        float surfH = uBaseSea + uwWaveFast(p.xz);
+        float z = surfH - p.y;
+        if (z <= 0.0) continue;
+        float caus = causticsSampleShaft(p, z);
+        vec3 Tl = exp(-UW_SIG_T * (s + z / mu));
+        shafts += max(caus - 0.82, 0.0) * Tl * ds;
+      }
+      float upRay = 1.0 + 1.35 * smoothstep(-0.1, 0.75, dir.y);
+      shafts *= sunE * UW_SIG_S * (phase * 1.4 + 0.055) * 3.4 * upRay;
+    }
   }
 
   outColor = vec4(max(shafts, vec3(0.0)), waterDist);
@@ -397,6 +383,10 @@ export const UW_COMPOSITE_GLSL = /* glsl */`
 uniform sampler2D tDepth;
 uniform sampler2D tUwShafts;
 uniform float uHasUwShafts;
+uniform vec3 uAguaVeu;        // luz difusa que a água devolve por metro (atmosphere.js)
+uniform vec3 uAguaVeuSol;     // sol direto que a água espalha por metro (atmosphere.js)
+uniform float uAguaTurva;     // 1 = a água turva de antes (lago, rio, mundo sem o mar do arquipélago) · 0 = água clara do mar
+uniform float uCaustTela;     // quanto da cáustica de tela ainda se aplica (0 no mar: o material já recebe a de refração)
 ${UW_COMMON_GLSL}
 
 // Diferença vertical (metros) entre a onda na lente e o ponto do raio no plano da lente:
@@ -522,9 +512,11 @@ vec3 underwaterComposite(vec2 uv, out float outUnderMask) {
       float hitWave = uwWaveHeightAndSlope(hitP.xz, hitSlope);
       float hitDepth = max(uBaseSea + hitWave - hitP.y, 0.0);
       if (hitDepth > 0.02) {
+        // (24/11/2026) A rede de luz agora é a de refração, aplicada no material de cada coisa (U.uCaust): somar esta por
+        // cima, na tela, dobrava o desenho com outro padrão. Fica só um resto, para os modelos que não têm material próprio.
         vec3 surfCaust = causticsSample(hitP, hitDepth, hitSlope, true);
         float sunReach = exp(-hitDepth * 0.09) * smoothstep(30.0, 4.0, dist);
-        base *= mix(vec3(1.0), surfCaust, sunReach * 0.48);
+        base *= mix(vec3(1.0), surfCaust, sunReach * 0.48 * uCaustTela);
       }
     }
 
@@ -572,8 +564,11 @@ vec3 underwaterComposite(vec2 uv, out float outUnderMask) {
       extraShafts = acc / wSum;
     }
 
-    vec3 T = exp(-UW_SIG_T * waterDist);
-    vec3 uwCol = base * T + inSun + inAmb + columnTint + extraShafts;
+    // Água clara (24/11/2026): o que está atrás perde luz pela extinção da água e ganha o véu que ela devolve; o véu
+    // é mais forte na direção do sol refratado (a água espalha para a frente) e mais claro olhando para cima.
+    vec3 T = exp(-AGUA_EXT * waterDist);
+    vec3 veu = aguaVeu(uAguaVeu, uAguaVeuSol * aguaFase(dot(dir, uLightDir)), zc, dir.y, waterDist, uLightDir.y);
+    vec3 uwCol = mix(base * T + veu, base * exp(-UW_SIG_T * waterDist) + inSun + inAmb + columnTint, uAguaTurva) + extraShafts;
     result = mix(base, uwCol, underWeight);
     outUnderMask = underWeight;
   }

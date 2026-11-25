@@ -7,6 +7,8 @@
 // usado no VR e nos perfis sem pós-processamento; 0 = sai luz linear (HDR) e quem fecha é o post.js.
 
 import * as THREE from '../three.js';
+import { AGUA_GLSL } from './agua-clara.js';
+import { CAUSTICA_GLSL } from './causticas.js';
 import { TINT_B0, TINT_C0, TINT_D0, TEX_INDEX } from '../../shared/blocks.js';
 import { CANOPY_WIND } from './wind.js';
 import { WATER_REFLECTION } from './water-reflection.js';
@@ -47,6 +49,13 @@ export const U = {
   uWaterShallow: { value: new THREE.Vector3(0.11, 0.43, 0.39) },    // água rasa Tidewater (turquesa sobre areia de coral)
   uSea: { value: -1e4 },
   uMarNovo: { value: 0 },                                   // 1 = o mar do arquipélago (render/oceano.js) desenha a superfície e o espraiamento                                    // altura da superfície do mar (cáusticas e absorção); muito baixo = desligado
+  // água clara do mar (render/agua-clara.js, 24/11/2026): no mar a luz vem da coluna d'água, não da luz dos blocos
+  uCaust: { value: null },                                   // cáusticas por refração (render/causticas.js), canal r, média ~1
+  uMarMapa: { value: null },                                 // fundo em volta da ilha ativa (render/oceano.js): r = chão − nível do mar, g = distância à costa (m)
+  uMarCaixa: { value: new THREE.Vector4(0, 0, 1, 1) },       // x0, z0, 1 / largura, 1 / comprimento desse mapa
+  uAguaCeu: { value: new THREE.Vector3(0.2, 0.5, 0.62) },    // luz difusa logo abaixo da superfície (atmosphere.js)
+  uAguaVeu: { value: new THREE.Vector3(0.004, 0.004, 0.005) }, // luz que a água devolve por metro, já com a luz do dia (atmosphere.js)
+  uAguaVeuSol: { value: new THREE.Vector3(0.004, 0.009, 0.011) }, // a parte do véu que vem do sol direto, por metro (atmosphere.js)
   uOmen: { value: new THREE.Vector4(0, 1, 0, 0) },      // direção no céu + intensidade da aparição
   uTex: { value: null },
   uMcTex: { value: null },                                   // folha de texturas dos blocos do Minecraft (world/mc-pacote.js)
@@ -471,6 +480,9 @@ uniform sampler2D uNoise;
 uniform float uCloudCover, uTexSize, uSea, uWetness;
 uniform vec3 uWind;
 uniform vec3 cameraPosition;
+uniform sampler2D uCaust, uMarMapa;
+uniform vec4 uMarCaixa;
+uniform vec3 uAguaCeu;
 #ifdef PBR
 uniform sampler2DArray uSurf;
 #endif
@@ -494,6 +506,8 @@ ${COMMON}
 ${VR_SURFACE}
 ${TIDEWATER_TERRAIN_GLSL}
 ${POCA_GLSL}
+${AGUA_GLSL}
+${CAUSTICA_GLSL}
 in vec2 vUv;
 in float vLayer;
 in vec3 vLight;
@@ -764,7 +778,33 @@ void main() {
 #endif
   float sky = vLight.x, blk = vLight.y, ao = vLight.z;
   float fwXZ = max(length(dFdx(vWorld.xz)), length(dFdy(vWorld.xz)));
+  // Debaixo do mar do arquipélago (24/11/2026): a luz do céu dos blocos perde 1 por bloco de água e a 15 m de fundura é
+  // zero; o fundo do mar ficava preto. Ali a luz vem da coluna d'água (marK). Terra adentro (mina, porão, caverna abaixo
+  // do nível do mar) não é mar: a distância à costa do mapa do oceano separa as duas coisas.
+  float wd = uSea - vWorld.y, uw = 0.0, marK = 0.0;
+  if (wd > 0.0 && uMarNovo > 0.5) {
+    vec2 um = (vWorld.xz - uMarCaixa.xy) * uMarCaixa.zw;
+    vec2 tm = vec2(textureSize(uMarMapa, 0));
+    float costa = (um.x >= 0.0 && um.y >= 0.0 && um.x <= 1.0 && um.y <= 1.0) ? textureLod(uMarMapa, (um * (tm - 1.0) + 0.5) / tm, 0.0).g : 600.0;
+    marK = smoothstep(0.0, 0.3, wd) * smoothstep(-4.0, 2.0, costa);
+  }
   float isSandLayer = (abs(vLayer - ${TEX_INDEX.sand}.0) < 0.5 || abs(vLayer - ${TEX_INDEX.sandstone}.0) < 0.5) && vTop < 1.5 ? 1.0 : 0.0;
+  // Sedimento: no mar, o que olha para cima abaixo de ~2 m de fundura fica coberto de areia clara e ondulada (o fundo
+  // de basalto, argila e cascalho continua lá: é só a pele). Sem isto o fundo de 30 m era quase preto e listrado, e a
+  // rede de luz do sol não tinha onde aparecer. Parede e degrau seguem mostrando a rocha.
+  float sedimento = isSandLayer > 0.5 || vTop > 1.5 ? 0.0 : marK * smoothstep(0.55, 0.9, Ng.y) * smoothstep(1.5, 6.0, wd);
+  if (sedimento > 0.01) {
+    albedo = mix(albedo, vec3(0.60, 0.53, 0.38), sedimento);
+    rough = mix(rough, 0.94, sedimento);
+    metal *= 1.0 - sedimento;
+    emissive *= 1.0 - sedimento;
+    // a areia assenta macia por cima das rampas e degraus: a luz não segue cada faceta do bloco (visto através da água
+    // clara, o fundo em rampa virava uma colcha de losangos) nem as quinas escurecidas de cada degrau
+    N = normalize(mix(N, vec3(0.0, 1.0, 0.0), sedimento * 0.8));
+    Ng = normalize(mix(Ng, vec3(0.0, 1.0, 0.0), sedimento * 0.8));
+    ao = mix(ao, 1.0, sedimento * 0.75);
+    isSandLayer = sedimento;
+  }
   float swashFoamTerrain = 0.0;
   twApplySandAndShore(vWorld, Ng, uSea, uWind, uTime, dist, isSandLayer, fwXZ, albedo, N, rough, swashFoamTerrain);
   // Água sobre a superfície exposta (chuva e borda úmida costeira): escurece e reduz a rugosidade.
@@ -842,7 +882,9 @@ void main() {
   float ndlG = max(dot(Ng, uLightDir), 0.0);
   float ndl = max(dot(N, uLightDir), 0.0);
 #ifdef SHADOWS
-  sunVis = sunShadow(vWorld, Ng, ndlG, sunVis) * smoothstep(0.0, 0.2, sky);
+  sunVis = sunShadow(vWorld, Ng, ndlG, mix(sunVis, 1.0, marK)) * mix(smoothstep(0.0, 0.2, sky), 1.0, marK);
+#else
+  sunVis = mix(sunVis, 1.0, marK);
 #endif
 #ifdef CUTOUT
   float vegetation = (vLayer >= ${TINT_C0}.0 || vTop > 1.5) ? 1.0 : 0.0;
@@ -854,17 +896,30 @@ void main() {
            + texture(uNoise, vWorld.xz * 0.0041 + uTime * vec2(0.005, 0.002)).g * 0.4;
   sunVis *= 1.0 - 0.5 * smoothstep(uCloudCover, uCloudCover + 0.2, cn);
 #endif
-  // debaixo d'água: a luz do sol chega em rede (cáusticas Tidewater) e a cor some com a profundidade, o vermelho primeiro
-  float wd = uSea - vWorld.y, uw = 0.0;
+  // debaixo d'água: a luz do sol chega em rede (cáusticas) e a cor some com a profundidade, o vermelho primeiro.
+  // Fora do mar do arquipélago (lago, rio, mundo sem mapa) vale a rede de sempre; no mar, a de refração (uCaust).
   vec3 causticsCol = vec3(1.0);
 #ifdef CAUSTICS
   if (wd > 0.0) {
     uw = smoothstep(0.0, 0.25, wd) * (1.0 - smoothstep(0.94, 0.995, sky));
-    causticsCol = mix(vec3(1.0), twCausticsSample(vWorld, wd, uLightDir, uWind, uTime, fwXZ), uw * (1.0 - 0.45 * uMarNovo));
+    if (marK < 0.999) causticsCol = mix(vec3(1.0), twCausticsSample(vWorld, wd, uLightDir, uWind, uTime, fwXZ), uw * (1.0 - 0.45 * uMarNovo) * (1.0 - marK));
+    if (marK > 0.001) causticsCol *= mix(1.0, causticaDoMar(vWorld, uSea, dist), marK);
   }
 #endif
+  vec3 solCor = uSunColor;
   vec3 direct = uSunColor * ndl * sunVis * causticsCol;
   vec3 amb = mix(uAmbGround, uAmbSky, N.y * 0.5 + 0.5) * (sky * (0.25 + 0.75 * sky));
+  if (marK > 0.001) {
+    // sol direto: atenuado pelo caminho dentro d'água, mais difuso que no ar (a água espalha) · luz de cima: o céu visto
+    // de dentro d'água, atenuado pela fundura, mais um pouco do sol que o fundo claro devolve para o que olha para baixo
+    solCor = uSunColor * aguaSol(wd, uLightDir.y);
+    float cima = N.y * 0.5 + 0.5;
+    vec3 directMar = solCor * (clamp((dot(N, uLightDir) + 0.22) / 1.22, 0.0, 1.0) * sunVis) * causticsCol;
+    vec3 ambMar = uAguaCeu * aguaCeu(wd) * (0.22 + 0.78 * cima) + solCor * vec3(0.05, 0.046, 0.034) * (1.0 - cima);
+    direct = mix(direct, directMar, marK);
+    amb = mix(amb, ambMar, marK);
+    solCor = mix(uSunColor, solCor, marK);
+  }
   // tocha: tremula de leve e esquenta a cor conforme a luz se afasta da chama
   float flick = 1.0 + 0.05 * sin(uTime * 8.3 + dot(vWorld, vec3(0.9, 1.3, 0.7))) * sin(uTime * 3.1 + vWorld.x * 0.4);
   vec3 torch = uTorch * mix(vec3(1.0, 0.7, 0.4), vec3(1.0), blk) * (blk * blk * flick);
@@ -916,7 +971,7 @@ void main() {
   vec3 R = reflect(-V, N);
   float fn = f0 + (1.0 - f0) * pow(1.0 - max(dot(N, V), 0.0), 5.0);
   float smooth2 = (1.0 - rough) * (1.0 - rough);
-  vec3 spec = uSunColor * (D * fh * 0.25) * ndl * sunVis + skyBase(vec3(R.x, abs(R.y), R.z)) * fn * smooth2 * sky * (1.0 - pocaK);
+  vec3 spec = solCor * (D * fh * 0.25) * ndl * sunVis + skyBase(vec3(R.x, abs(R.y), R.z)) * fn * smooth2 * sky * (1.0 - pocaK);
   col += specCol * spec * ao;
 #endif
 #if defined(REAL) && !defined(CUTOUT) && !defined(MC)
@@ -928,7 +983,7 @@ void main() {
     col = mix(col, skyBase(vec3(Rp.x, abs(Rp.y), Rp.z)) * sky, pocaK * fp * mix(1.0, 0.6, uHeadset));
   }
 #endif
-  col *= mix(vec3(1.0), exp(-max(wd, 0.0) * vec3(0.2, 0.06, 0.04)), uw);
+  col *= mix(vec3(1.0), exp(-max(wd, 0.0) * vec3(0.2, 0.06, 0.04)), uw * (1.0 - marK));   // no mar a fundura já entrou na luz
   // Dispersão angular discreta em cristais/gelo. Aproximação de superfície;
   // não simula cáusticas refratadas através de todo o volume do mundo.
   if(vLayer==${TEX_INDEX.crystal_ore}.0 || vLayer==${TEX_INDEX.phantom_crystal}.0 || vLayer==${TEX_INDEX.ice}.0) {

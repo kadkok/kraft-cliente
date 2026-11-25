@@ -45,6 +45,7 @@ import { initPlantas3d } from './render/plantas3d.js';   // plantas com corpo 3D
 import { initRelva } from './render/relva.js';           // relva viva (prova de realismo, ?real=1)
 import { initVooPlanetario } from './render/voo-planetario.js';
 import { initOceano } from './render/oceano.js';         // mar contínuo do arquipélago (só com mapa de ilhas)
+import { createCausticas } from './render/causticas.js'; // cáusticas por refração: a rede de luz do sol debaixo d'água
 import { initCoqueiros } from './render/coqueiros.js';   // coqueiros da praia do arquipélago
 import { initAves } from './render/aves.js';             // gaivotas, trinta-réis, fragatas e maçaricos do litoral
 import { initRecife } from './render/recife.js';         // recife de corais em volta da ilha (modelos do Tidewater)
@@ -529,6 +530,15 @@ initPlantas3d({ scene, world, camera, game, quality, player });   // capim, sama
 initRelva({ scene, world, camera, game, quality, player });       // lâminas de grama sobre o gramado (só com ?real=1)
 game.vooPlanetario = initVooPlanetario({scene,game,player});
 initOceano({ scene, camera, game, world });                      // oceano até o horizonte, ondas e arrebentação (só no arquipélago)
+// Cáusticas (24/11/2026): uma textura pequena refeita na placa a cada quadro; terreno, recife e feixes de luz leem U.uCaust.
+// Só é refeita onde há mar e com quem olha perto dele (até 150 m acima do nível da água).
+game.causticas = createCausticas(renderer, game.plataforma === 'pc' || !game.plataforma ? {} : { lado: 256, grade: 96, cadaQuadros: 2 });
+game.hooks.frame.push(() => {
+  if (game.dim === 0 && U.uSea.value > -1000 && camera.getWorldPosition(menuCam).y < U.uSea.value + 150) {
+    game.causticas.update(U.uTime.value);
+    U.uCaust.value = game.causticas.texture;
+  }
+});
 initCoqueiros({ scene, camera, game, player });                           // coqueiros de verdade na faixa de praia
 initAves({ scene, camera, game, player });                        // aves do litoral (enfeite do lugar, cada aparelho as suas)
 initRecife({ scene, camera, game });                              // recife de corais (zonas pela fundura, balanço na ondulação)

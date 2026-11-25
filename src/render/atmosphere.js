@@ -12,6 +12,7 @@ import { NATURE } from './nature-state.js';
 import { DAY_LENGTH, DAY_PORTION, SEA } from '../../shared/constants.js';
 import { alturaOnda } from '../../shared/ondas.js';
 import { corNevoaSubmarina } from './submarino.js';
+import { AGUA, luzDoDia } from './agua-clara.js';
 
 const TILT = 0.6; // inclinação da órbita: ao meio-dia o sol fica a ~56° de altura
 const ss = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
@@ -232,6 +233,15 @@ export function createAtmosphere(scene, quality) {
       : (state.underwater ? Math.floor(lastCam.y) + 0.88 : -1e4);
     state.waterY = waveY;
 
+    // Água clara do mar (render/agua-clara.js): a luz difusa logo abaixo da superfície e o véu que a água devolve por
+    // metro saem da luz do dia deste instante (céu + parte do sol). Valem para o terreno, o recife e o pós-processamento.
+    {
+      const dia = luzDoDia(U.uSunColor.value, U.uAmbSky.value, U.uLightDir.value.y);
+      U.uAguaCeu.value.set(AGUA.cor[0] * dia, AGUA.cor[1] * dia, AGUA.cor[2] * dia);
+      U.uAguaVeu.value.set(AGUA.veu[0] * dia * AGUA.veuGanho, AGUA.veu[1] * dia * AGUA.veuGanho, AGUA.veu[2] * dia * AGUA.veuGanho);
+      const sl = U.uSunColor.value, alto = Math.max(0, Math.min(1, U.uLightDir.value.y * 4));      // sol rasante quase não entra na água
+      U.uAguaVeuSol.value.set(AGUA.veuSol[0] * sl.x * alto * AGUA.veuGanho, AGUA.veuSol[1] * sl.y * alto * AGUA.veuGanho, AGUA.veuSol[2] * sl.z * alto * AGUA.veuGanho);
+    }
     let uwFog = null;
     if (state.underwater) {
       // Óptica submarina Tidewater: absorção Beer-Lambert por distância e profundidade (turquesa raso -> azul oceânico escuro).
@@ -243,14 +253,21 @@ export function createAtmosphere(scene, quality) {
       const dayK = 0.26 + day2 * 0.74;
       uwFog = corNevoaSubmarina(camDepth, U.uLightDir.value, U.uSunColor.value, U.uAmbSky.value, dayK);
       U.uFogTint.value.set(uwFog.r, uwFog.g, uwFog.b, 1);
+      const claro = U.uMarNovo.value > 0.5;      // o mar do arquipélago: água clara (24/11/2026); lago e rio seguem como eram
       if (U.uDirect.value > 0.5) {
         // Sem pós-processamento (VR / perfil baixo): a névoa e a bruma dos shaders diretos fecham a absorção submarina
-        const farUw = (16 + 6 * (1 - Math.min(1, rain))) * (1 - uwFog.deepK * 0.25);
-        U.uFog.value.set(1.1, Math.max(6, farUw));
-        U.uHaze.value.set(0.42, 0.068, Math.max(sea, 0), 0.008);
+        if (claro) {
+          U.uFog.value.set(AGUA.vista * 0.3, AGUA.vista * (0.95 - 0.12 * Math.min(1, rain)));
+          U.uHaze.value.set(0.86, 0.034, Math.max(sea, 0), 0.0);
+        } else {
+          const farUw = (16 + 6 * (1 - Math.min(1, rain))) * (1 - uwFog.deepK * 0.25);
+          U.uFog.value.set(1.1, Math.max(6, farUw));
+          U.uHaze.value.set(0.42, 0.068, Math.max(sea, 0), 0.008);
+        }
       } else {
         // Com pós-processamento: o post.js integra a absorção por pixel e a névoa do terreno fecha o horizonte distante
-        U.uFog.value.set(16, 44 + 8 * (1 - Math.min(1, rain)));
+        if (claro) U.uFog.value.set(AGUA.vista * 0.62, AGUA.vista * 1.04);
+        else U.uFog.value.set(16, 44 + 8 * (1 - Math.min(1, rain)));
         U.uHaze.value.x = 0;
       }
     } else {

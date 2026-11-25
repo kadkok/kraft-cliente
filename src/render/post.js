@@ -256,6 +256,9 @@ export function createPost(renderer, cfg, lente = null) {
   const mDof = mk(DOF_FS, { tSrc: { value: null }, tDepth: { value: null }, uTexel: v2(), uPlanos: v2(), uLente: { value: new THREE.Vector4(8, 0, 1, 1.2) } });
   const mUwShafts = mk(UW_SHAFTS_FS, {
     tDepth: { value: null },
+    tCaust: { value: null },
+    uAguaVeuSol: U.uAguaVeuSol,
+    uAguaTurva: { value: 0 },
     ...uwShared,
   });
   const mFinal = mk(FINAL_FS, {
@@ -263,6 +266,7 @@ export function createPost(renderer, cfg, lente = null) {
     tDepth: { value: null }, tUwShafts: { value: null }, uHasUwShafts: { value: 0 },
     uBloom: { value: (cfg.bloom ?? 0.5) * .55 }, uExposure: U.uExposure, uAspect: { value: 1 }, uUnder: { value: 0 },
     uLookUp: { value: 0 },
+    uAguaVeu: U.uAguaVeu, uAguaVeuSol: U.uAguaVeuSol, uAguaTurva: { value: 0 }, uCaustTela: { value: 0 },
     uVignette: { value: cfg.vignette ?? 0.2 }, uGrade: { value: cfg.grade ?? 1 }, uRayColor: { value: new THREE.Vector3() },
     uTom: { value: lente?.tom === 'neutro' ? (lente.ganho ?? 0.92) : 0 },     // 0 = curva de cinema de sempre · > 0 = curva neutra, com este ganho
     ...uwShared,
@@ -374,6 +378,8 @@ export function createPost(renderer, cfg, lente = null) {
     let hasUwShafts = 0;
     if (uwShafts && surf.active && (cfg.rays !== false)) {
       mUwShafts.uniforms.tDepth.value = scene.depthTexture;
+      mUwShafts.uniforms.tCaust.value = U.uCaust.value || black;
+      mUwShafts.uniforms.uAguaTurva.value = U.uMarNovo.value > 0.5 ? 0 : 1;
       pass(mUwShafts, uwShafts);
       hasUwShafts = 1;
     }
@@ -408,6 +414,8 @@ export function createPost(renderer, cfg, lente = null) {
     // A câmera do three olha para o -Z local. O componente Y disso é o quanto se olha para cima.
     const e = camera.matrixWorld.elements;
     u.uLookUp.value = -e[9];
+    // no mar do arquipélago vale a água clara; em lago, rio e mundo sem esse mar, a água turva e a cáustica de tela de antes
+    u.uAguaTurva.value = U.uMarNovo.value > 0.5 ? 0 : 1; u.uCaustTela.value = U.uMarNovo.value > 0.5 ? 0 : 1;
     pass(mFinal, null);
   }
 

@@ -48,9 +48,40 @@ export function estadoDoTempo(w) {
 }
 const KA_ONDULACAO = ESPECTRO.slice(0, 3).reduce((t, e) => t + e[1], 0), KA_VENTO = ESPECTRO.slice(3).reduce((t, e) => t + e[1], 0);
 
+// ---- onda que não cabe no pixel (24/11/2026; relato do Kadmus: o mar visto de cima e de longe "chiava") -----------
+// Olhando rasante, um pixel cobre vários metros de mar NA DIREÇÃO DO OLHAR e só centímetros de lado. Onda mais curta
+// do que isso não pode entrar na normal: a placa lê um ponto por pixel, sorteia uma face da onda e a imagem vira
+// grão que treme. Cada onda é pesada pela fase que anda de um pixel para o vizinho (g, em radianos por pixel):
+//   peso = exp(−MAR_FILTRO · g²)   → 1 quando a onda ocupa muitos pixels; ~0 perto de 2 pixels por onda (Nyquist).
+// O que sai da normal não some: vira variância de inclinação (metade de (k·A)² por onda, vezes 1 − peso²) e vai para
+// a aspereza de quem desenha (reflexo médio, Fresnel médio, brilho do sol espalhado, borda da janela de Snell).
+// É a "passagem da geometria para a aspereza" de Bruneton, Neyret e Holzschuch (2010), a mesma conta do arquivo de
+// referência que o Kadmus mandou (Abyssal Garden: peso por pegada e variância acumulada em cada onda).
+export const MAR_FILTRO = 0.35;
+export const pesoDoPixel = (g2) => Math.exp(-MAR_FILTRO * g2);
+// Uma onda (índice i) vista com o pixel andando (dpx, dpy) metros no plano do mar: { peso, perdido } — `perdido` é
+// a variância de inclinação que foi para a aspereza. amp = multiplicador de amplitude (estado do mar × fundo).
+export function ondaNoPixel(i, vento, dpx, dpy, amp = 1) {
+  const o = ONDAS[i], v = ventoMar(vento), ca = Math.cos(o.ang), sa = Math.sin(o.ang);
+  const dx = v.x * ca - v.z * sa, dz = v.x * sa + v.z * ca;
+  const gx = o.k * (dx * dpx[0] + dz * dpx[1]), gy = o.k * (dx * dpy[0] + dz * dpy[1]);
+  const peso = pesoDoPixel(gx * gx + gy * gy), ka = o.k * o.A * amp;
+  return { peso, perdido: 0.5 * ka * ka * (1 - peso * peso), inteiro: 0.5 * ka * ka };
+}
+
 const sstep = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const fract = (x) => x - Math.floor(x);
 const hash1 = (n) => fract(Math.sin(n * 127.1) * 43758.5453);
+
+// A maior altura (m, acima do repouso) que a superfície pode alcançar num estado do mar: todas as ondas do mar aberto
+// em fase, mais a maior onda da arrebentação e a ressaca. É teto, não medida: serve para saber que um olho acima
+// disso está com certeza no ar e enxerga a água sempre por cima (render/oceano.js descarta o lado de trás das ondas).
+export function tetoDasOndas(E) {
+  const M = multMar(E);
+  let y = M.ressaca + COSTA.A0 * M.costa * 1.8;
+  for (let i = 0; i < ONDAS.length; i++) y += ONDAS[i].A * (i < N_ONDULACAO ? M.ondulacao : M.vento);
+  return y;
+}
 
 // direção do vento (vx, vz, unitária) e força (0..2): o tempo do mundo empurra o mar
 export function ventoMar(w) {
@@ -144,6 +175,37 @@ vec3 marAberto(vec2 p, float t, float prof, float s, vec3 vento, float lod, out 
   nrmOut = n; cristaOut = jac;
   d.y += ressaca(vento.z, s);
   return d;
+}
+
+// Mar aberto para o FRAGMENTO: a mesma soma de ondas, mas cada uma pesada pelo que cabe no pixel NA DIREÇÃO DELA.
+// dpx, dpy = quanto p (x, z do mundo) anda de um pixel para o vizinho: dFdx(p), dFdy(p).
+// nrmOut = normal só com o que o pixel resolve (sem normalizar); cristaOut = aperto da crista resolvida;
+// varOut = inclinação que não coube, como variância (xx, zz, xz); cristaVarOut = variância do aperto que não coube.
+const float MAR_FILTRO = ${f(MAR_FILTRO)};
+const float MAR_CA[MAR_N] = float[](${ONDAS.map((o) => f(Math.cos(o.ang))).join(', ')});
+const float MAR_SA[MAR_N] = float[](${ONDAS.map((o) => f(Math.sin(o.ang))).join(', ')});
+void marAbertoPx(vec2 p, float t, float prof, float s, vec3 vento, vec2 dpx, vec2 dpy, out vec3 nrmOut, out float cristaOut, out vec3 varOut, out float cristaVarOut) {
+  vec3 n = vec3(0.0, 1.0, 0.0); float jac = 0.0; vec3 var = vec3(0.0); float jv = 0.0;
+  float mo = multOnd(vento.z), mv = multVen(vento.z);
+  float q = min(0.85, 0.95 / max(KA_OND * mo + KA_VEN * mv, 1e-3));
+  for (int i = 0; i < MAR_N; i++) {
+    float a = MAR_A[i] * (i < MAR_NOND ? mo : mv) * marAtenua(i, prof, s);
+    if (a < 1e-4) continue;
+    vec2 dir = vec2(vento.x * MAR_CA[i] - vento.y * MAR_SA[i], vento.x * MAR_SA[i] + vento.y * MAR_CA[i]);
+    float ka = MAR_K[i] * a;
+    vec2 g = MAR_K[i] * vec2(dot(dir, dpx), dot(dir, dpy));     // fase que a onda anda de um pixel para o vizinho
+    // (a comparação também segura derivada infinita ou indefinida na borda de um triângulo visto de perfil: peso 0)
+    float g2 = dot(g, g), w = g2 < 17.0 ? exp(-MAR_FILTRO * g2) : 0.0;
+    float perdido = 0.5 * ka * ka * (1.0 - w * w);
+    var += perdido * vec3(dir.x * dir.x, dir.y * dir.y, dir.x * dir.y);
+    jv += perdido * q * q;
+    if (w < 0.003) continue;
+    float th = MAR_K[i] * dot(dir, p) - MAR_W[i] * t + MAR_FASE[i];
+    float c = cos(th), sn = sin(th), kw = ka * w;
+    n.x -= dir.x * kw * c; n.z -= dir.y * kw * c; n.y -= q * kw * sn;
+    jac += q * kw * sn;
+  }
+  nrmOut = n; cristaOut = jac; varOut = var; cristaVarOut = jv;
 }
 
 // Arrebentação. gS = gradiente de s (para a normal). Devolve a altura; espumaOut = quanto está quebrando;

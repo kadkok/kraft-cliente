@@ -19,7 +19,8 @@ import { U, COMMON } from './materials.js';
 import { RAIO_GELO, mascaraBanquisa } from '../../shared/fortaleza.js';
 import { RAIO_BANQUISA } from '../../shared/fortaleza-banquisa.js';
 import { mascaraNaMare } from '../../shared/ferrovia-terreno.js';
-import { MAR_GLSL, MAR_NIVEL, alturaMar, estadoDoTempo, multMar } from '../../shared/mar.js';
+import { MAR_GLSL, MAR_NIVEL, alturaMar, estadoDoTempo, multMar, tetoDasOndas } from '../../shared/mar.js';
+import { AGUA_GLSL } from './agua-clara.js';
 import { B } from '../../shared/blocks.js';
 import { CW } from '../../shared/constants.js';
 
@@ -81,16 +82,21 @@ function texturaDetalhe(n = 256) {
     for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) h[i + j * n] += a * Math.sin((fx * i + fz * j) / n * 6.283 + ph);
   }
   const d = new Uint8Array(n * n * 4);
+  let inclinado = 0;
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++) {
     const gx = h[((i + 1) % n) + j * n] - h[((i - 1 + n) % n) + j * n];
     const gz = h[i + ((j + 1) % n) * n] - h[i + ((j - 1 + n) % n) * n];
     const k = (i + j * n) * 4, s = 2.2;
     let nx = -gx * s, nz = -gz * s, ny = 1; const l = Math.hypot(nx, ny, nz); nx /= l; ny /= l; nz /= l;
     d[k] = (nx * 0.5 + 0.5) * 255; d[k + 1] = (nz * 0.5 + 0.5) * 255; d[k + 2] = ny * 255; d[k + 3] = 255;
+    inclinado += nx * nx + nz * nz;
   }
   const t = new THREE.DataTexture(d, n, n, THREE.RGBAFormat);
   t.wrapS = t.wrapT = THREE.RepeatWrapping; t.magFilter = THREE.LinearFilter; t.minFilter = THREE.LinearMipmapLinearFilter;
   t.generateMipmaps = true; t.anisotropy = 4; t.needsUpdate = true;
+  // quanto esta textura inclina a superfície, em média (x² + z² da normal, na resolução cheia): é o que o detalhe
+  // deixa de mostrar quando a placa lê a versão reduzida ou quando ele some com a distância (vai para a aspereza)
+  t.userData.variancia = inclinado / (n * n);
   return t;
 }
 function texturaEspuma(n = 256) {
@@ -293,6 +299,10 @@ uniform vec3 cameraPosition;
 uniform vec3 uMarVento;
 uniform float uMarTempo, uMarFase;
 uniform sampler2D uMarMapa, uMarDet, uMarEsp;
+uniform float uMarDetVar;      // inclinação média da textura de detalhe na resolução cheia (texturaDetalhe)
+uniform float uMarDoAlto;      // 1 = o olho está acima de qualquer onda possível agora (com certeza no ar)
+uniform float uMarFundoAte;    // até onde (m, na horizontal) há terreno carregado em volta de quem olha
+${AGUA_GLSL}
 uniform vec4 uMarCaixa;
 uniform vec3 uWaterColor, uWaterShallow;
 in vec3 vVirt;
@@ -314,6 +324,12 @@ float ggx(float nh, float r) { float a2 = r * r * r * r; float d = nh * nh * (a2
 
 void main() {
   vec3 P = vVirt;
+  // quanto o ponto do mar anda de um pixel para o vizinho (m): a pegada do pixel, medida antes de qualquer descarte
+  vec2 dpx = dFdx(vVirt.xz), dpy = dFdy(vVirt.xz);
+  // Quem olha de cima de todas as ondas só pode ver a água pelo lado de cima; o lado de baixo de uma face só aparece
+  // escondido atrás de uma crista. O mar é desenhado sem gravar profundidade (duas passadas que somam), então essa
+  // face escondida somava a luz dela por cima da crista: riscos claros nas ondas grandes vistas de longe.
+  if (uMarDoAlto > 0.5 && !gl_FrontFacing) discard;
   if (uGeleira.z > 0.0) {
     vec2 dxz = floor(P.xz) - uGeleira.xy;
     if (dot(dxz, dxz) <= uGeleira.z) {
@@ -350,10 +366,12 @@ void main() {
   float coluna = P.y - chao;                      // água entre a superfície e o chão
   if (coluna < 0.0 || prof < -1.6) discard;       // areia acima da água (o espraiamento é que avança sobre ela)
 
-  // normal: mar aberto (por pixel) + arrebentação + detalhe que rola com o vento
-  float pegada = max(0.02, dist * 0.0016);
-  vec3 n; float crista;
-  marAberto(p, uMarTempo, prof, s, uMarVento, pegada * 2.5, n, crista);
+  // normal: mar aberto (por pixel) + arrebentação + detalhe que rola com o vento.
+  // Cada onda entra com o peso do que cabe no pixel NA DIREÇÃO DELA (shared/mar.js → marAbertoPx). Olhando rasante,
+  // a pegada do pixel no mar é comprida no sentido do olhar; a conta antiga só olhava a distância e deixava passar
+  // onda bem menor que o pixel: cada pixel sorteava uma face de onda e o mar virava grão que treme (24/11/2026).
+  vec3 n; float crista; vec3 varOnda; float cristaVar;
+  marAbertoPx(p, uMarTempo, prof, s, uMarVento, dpx, dpy, n, crista, varOnda, cristaVar);
   float espC, frente, incl;
   marCosta(p, uMarFase, uMarVento.z, prof, s, espC, frente, incl);
   float e = 4.0;
@@ -363,7 +381,20 @@ void main() {
   float fd = 1.0 - smoothstep(25.0, 260.0, dist);
   vec3 d1 = texture(uMarDet, p * 0.061 + vv * uMarTempo * 0.021).xzy * 2.0 - 1.0;
   vec3 d2 = texture(uMarDet, p * 0.157 - vec2(vv.y, -vv.x) * uMarTempo * 0.034 + 0.37).xzy * 2.0 - 1.0;
-  vec3 N = normalize(n + vec3(d1.x + d2.x * 0.6, 0.0, d1.z + d2.z * 0.6) * (0.32 * fd * (0.6 + 0.4 * uMarVento.z)));
+  float forcaDet = 0.32 * (0.6 + 0.4 * uMarVento.z);
+  vec3 N = normalize(n + vec3(d1.x + d2.x * 0.6, 0.0, d1.z + d2.z * 0.6) * (forcaDet * fd));
+
+  // ---- o que não coube no pixel vira aspereza (variância de inclinação) ----------------------------------------
+  // ondas: varOnda. Detalhe: a parte que a placa leu já borrada (a normal média encolhe: 1 − |d|²; o canal de cima
+  // é gravado sem o meio-tom, daí o 0,5·y + 0,5) e a parte apagada pela distância (fd). Nada some: muda de lugar.
+  vec3 t1 = vec3(d1.x, 0.5 * d1.y + 0.5, d1.z), t2 = vec3(d2.x, 0.5 * d2.y + 0.5, d2.z);
+  float detPerdido = forcaDet * forcaDet * ((1.0 - fd * fd) * 1.36 * uMarDetVar
+    + fd * fd * (max(0.0, 0.995 - dot(t1, t1)) + 0.36 * max(0.0, 0.995 - dot(t2, t2))));
+  vec2 vh = V.xz / max(length(V.xz), 1e-4);
+  // ao longo do olhar (é a que levanta o reflexo e muda o Fresnel) e a soma das duas direções (espalha o brilho)
+  float varOlhar = max(0.0, varOnda.x * vh.x * vh.x + varOnda.y * vh.y * vh.y + 2.0 * varOnda.z * vh.x * vh.y) + 0.5 * detPerdido;
+  float varTotal = varOnda.x + varOnda.y + detPerdido;
+  float sigOlhar = sqrt(varOlhar), sigTotal = sqrt(varTotal);
 
   bool sob = cameraPosition.y < P.y - 0.02;       // olhando de baixo d'água
   if (sob) N = -N;
@@ -379,23 +410,43 @@ void main() {
   float espuma = espC * frente * smoothstep(0.2, 0.62, bolhas + espC * 0.3);              // crista quebrando + renda atrás
   espuma += espC * smoothstep(0.55, 0.8, bolhas) * 0.25;                                   // pontos soltos na zona de arrebentação
   float ventoEsp = smoothstep(0.25, 0.9, uMarVento.z);
-  espuma += smoothstep(0.32, 0.58, crista) * smoothstep(0.45, 0.8, bolhas) * (0.35 + 0.65 * ventoEsp);   // carneirinhos
+  // carneirinhos: a crista que não coube no pixel alarga o limiar (vira cobertura média em vez de ponto que pisca)
+  float folga = 2.0 * sqrt(cristaVar);
+  espuma += smoothstep(0.32 - folga, 0.58 + folga, crista) * smoothstep(0.45, 0.8, bolhas) * (0.35 + 0.65 * ventoEsp);
   espuma += smoothstep(0.12, 0.0, coluna) * smoothstep(0.45, 0.75, bolhas + 0.2) * smoothstep(1.5, -0.6, prof) * 0.85;   // borda do espraiamento
   espuma = clamp(espuma, 0.0, 1.0) * (1.0 - smoothstep(180.0, 700.0, dist));
 
   vec3 cor; vec3 trans;
   if (!sob) {
-    float F = fresnelDieletrico(max(cosV, 0.0), 1.0 / 1.333);
+    // Fresnel médio da superfície áspera (Bruneton, Neyret e Holzschuch, 2010): rasante, as faces viradas para quem
+    // olha aparecem mais, e o mar ao longe devolve MENOS céu que um espelho plano (por isso é mais escuro que o
+    // horizonte). Sem aspereza (sigOlhar = 0) a conta devolve exatamente o Fresnel de antes.
+    float cv = max(cosV, 0.0), um = 1.0 - cv, schlick = um * um;
+    schlick *= schlick * um;
+    float medio = pow(um, 5.0 * exp(-2.69 * sigOlhar)) / (1.0 + 22.7 * pow(sigOlhar, 1.5));
+    float F = clamp(fresnelDieletrico(cv, 1.0 / 1.333) + 0.98 * (medio - schlick), 0.02, 1.0);
     vec3 R = reflect(-V, N); R.y = abs(R.y);
+    // o reflexo médio sobe no céu: inclinação média das faces que se veem (normal com desvio sigOlhar, pesada pela
+    // área à mostra de quem olha com a elevação "rasa"); cada grau de inclinação levanta o reflexo dois
+    float rasa = max(V.y, 0.0) / max(length(V.xz), 1e-4), u = rasa / max(sigOlhar, 1e-4);
+    float sobe = sigOlhar * (1.684 + u) / (1.344 + 1.11 * u + u * u);
+    R = normalize(vec3(R.x, R.y + 2.0 * sobe * (1.0 - R.y), R.z));
     vec3 ceu = skyBase(R);
     vec3 H = normalize(L + V);
     float rug = mix(0.07, 0.16, smoothstep(40.0, 600.0, dist)) + 0.1 * smoothstep(0.4, 1.0, uMarVento.z);
-    vec3 brilho = luzSol * ggx(max(dot(N, H), 0.0), rug) * F * 0.9 * step(0.0, uSunDir.y);
+    // brilho do sol: a aspereza do espelho (rug) mais a das ondas que não couberam; longe, as faíscas soltas viram
+    // o caminho de luz largo e parado. O Fresnel é o do meio-vetor (a face que devolve o sol para quem olha).
+    float a2 = rug * rug * rug * rug + varTotal, nh = max(dot(N, H), 0.0), dg = nh * nh * (a2 - 1.0) + 1.0;
+    vec3 brilho = luzSol * (a2 / (3.14159 * dg * dg)) * fresnelDieletrico(max(dot(V, H), 0.0), 1.0 / 1.333) * 0.9 * step(0.0, uSunDir.y);
     // caminho da luz dentro da água até o chão (Beer-Lambert): o raso deixa ver a areia, o fundo fica azul-safira
+    // (24/11/2026, água clara) O fundo já chega iluminado pela coluna d'água (o terreno e o recife fazem essa conta):
+    // aqui só entra o caminho de volta, do fundo até a superfície, pelo ângulo do olhar já refratado. Com a água clara
+    // vê-se o recife e a areia de cima até uns 15 a 20 m de fundura.
     float cosT = sqrt(max(0.0, 1.0 - (1.0 - cosV * cosV) / (1.333 * 1.333)));
-    float caminho = min(coluna, 60.0) * (1.0 + 1.0 / max(cosT, 0.2));
-    vec3 sigma = vec3(0.42, 0.072, 0.041);
-    vec3 T = exp(-sigma * caminho);
+    float caminho = min(coluna, 80.0) / max(cosT, 0.2);
+    // o fundo só existe onde o mundo está carregado: perto do fim dele a água fecha (senão, voando alto sobre o mar
+    // fundo, via-se a borda recortada do terreno carregado através da água clara)
+    vec3 T = exp(-AGUA_EXT * caminho) * (1.0 - smoothstep(0.5, 0.88, length(P.xz - cameraPosition.xz) / uMarFundoAte));
     vec3 luzAgua = (luzSol * 0.55 + uAmbSky * 1.1) * mix(0.35, 1.0, dia);
     float raso = 1.0 - smoothstep(0.5, 9.0, coluna);
     vec3 corpo = mix(uWaterColor, uWaterShallow, raso * 0.85) * luzAgua * mix(1.0, 0.55, smoothstep(0.5, 1.0, uMarVento.z));
@@ -421,10 +472,16 @@ void main() {
   } else {
     // de baixo: dentro da janela de Snell vê-se o céu; fora dela, o espelho da água de dentro
     vec3 Rt = refract(-V, N, 1.333);
-    float F = dot(Rt, Rt) < 1e-4 ? 1.0 : fresnelDieletrico(max(cosV, 0.0), 1.333);
-    vec3 ceu = skyBase(normalize(Rt + vec3(0.0, 1e-3, 0.0))) * 1.1;
+    bool espelho = dot(Rt, Rt) < 1e-4;              // reflexão total: nenhuma luz do céu atravessa esta face
+    float F = espelho ? 1.0 : fresnelDieletrico(max(cosV, 0.0), 1.333);
+    // onda que não coube no pixel: a borda da janela (ângulo crítico, cosseno 0,6614) deixa de ser um risco que
+    // pisca e vira a fração das faces que deixam o céu passar (a mesma conta do Abyssal Garden, a referência do Kadmus)
+    float janela = smoothstep(-1.0, 1.0, (cosV - 0.6614) / max(sigTotal * 1.1, 1e-3)) * 0.78;
+    float passa = mix(1.0 - F, janela, clamp(sigTotal * 9.0, 0.0, 1.0));
+    vec3 rumoCeu = espelho ? normalize(vec3(-V.x, 0.06, -V.z)) : normalize(Rt + vec3(0.0, 1e-3, 0.0));
+    vec3 ceu = skyBase(rumoCeu) * 1.1;
     vec3 dentro = uWaterColor * (luzSol * 0.4 + uAmbSky) * 0.9;
-    cor = mix(ceu, dentro, F) + espuma * uAmbSky * 0.6;
+    cor = mix(dentro, ceu, passa) + espuma * uAmbSky * 0.6;
     float vela = exp(-dist * 0.045);
     cor = mix(uWaterColor * (uAmbSky * 0.9 + luzSol * 0.2), cor, vela);
     trans = vec3(0.0);
@@ -446,6 +503,7 @@ export function initOceano({ scene, camera, game, world }) {
   let indiceGaleria, ultimoX, ultimoZ;
   const uOrigemChunks = { value: new THREE.Vector2() };
   const uChunksComMalha = { value: null };
+  const detalhe = texturaDetalhe();
   const uniforms = {
     ...U,
     uOrigemChunks, uChunksComMalha, uGeleira: { value: new THREE.Vector3() },
@@ -455,11 +513,13 @@ export function initOceano({ scene, camera, game, world }) {
     uMarVento: { value: new THREE.Vector3(0.83, 0.55, 0.85) },
     uMarTempo: { value: 0 },
     uMarFase: { value: 0 },
-    uMarMapa: { value: null },
-    uMarCaixa: { value: new THREE.Vector4(0, 0, 1, 1) },
+    // uMarMapa e uMarCaixa vêm do registro U (são os mesmos objetos): o terreno lê a distância à costa do mesmo mapa
     uMarLonge: { value: null },
     uMarCaixaL: { value: new THREE.Vector4(0, 0, 0, 0) },
-    uMarDet: { value: texturaDetalhe() },
+    uMarDet: { value: detalhe },
+    uMarDetVar: { value: detalhe.userData.variancia },
+    uMarDoAlto: { value: 0 },
+    uMarFundoAte: { value: 150 },
     uMarEsp: { value: texturaEspuma() },
   };
   // passada 1: o que está atrás (fundo, peixes, corais) × transmitância da água em cada cor
@@ -625,6 +685,8 @@ export function initOceano({ scene, camera, game, world }) {
     const dl = Math.hypot(api.dir.x, api.dir.y) || 1;
     uniforms.uMarVento.value.set(api.dir.x / dl, api.dir.y / dl, api.estado);
     uniforms.uMarFase.value = api.fase;
+    uniforms.uMarDoAlto.value = c.y > MAR_NIVEL + tetoDasOndas(api.estado) + 0.5 ? 1 : 0;
+    uniforms.uMarFundoAte.value = Math.max(48, (world?.radius || 10) * CW);
     // o mundo carregado acaba em world.radius pedaços; dali em diante quem mostra as ilhas é o relevo distante, então
     // a névoa de borda (que apagava o fim do mundo carregado) sai. Fica a bruma do ar; névoa de chuva e de mergulho ficam.
     const R = (world?.radius || 10) * 16;
