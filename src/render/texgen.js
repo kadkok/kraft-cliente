@@ -666,6 +666,15 @@ function foliage(cr, cg, cb, needles) {
 }
 T.leaves = foliage(0.95, 1.0, 0.9, false);
 T.pine_leaves = foliage(0.6, 0.84, 0.76, true);
+T.sakura = (u,v,s,o) => {
+  T.leaves(u,v,s,o);
+  if (!o[3]) return;
+  const luz=o[1];
+  worley(u,v,11,11,s+19);
+  const flor=wd1<.66 && fbm(u,v,4,4,2,s+9)>.24;
+  if (flor) set(o,.72+.28*luz,.38+.51*luz+.08*wd1,.48+.43*luz+.06*wd1,1);
+  else set(o,.20+.29*luz,.20+.36*luz,.15+.22*luz,1);
+};
 
 // Gera todas as camadas: Uint8Array RGBA de size x size x camadas.
 export function generateTextures(size, names) {

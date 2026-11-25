@@ -28,8 +28,10 @@
 import { createSimplex, hash3, clamp, lerp } from './noise.js';
 import { B } from './blocks.js';
 import { criarCidade } from './cidade.js';
+import { criarVilaEdo, relevoEdo } from './xogunato.js';
 
 export const T_FLORESTA = 1, T_VULCAO = 2, T_NEVE = 3, T_CARIBE = 4, T_METROPOLE = 5, T_SELVAGEM = 6;
+export const T_XOGUNATO = 7;
 export const PRAIA_ILHA = 40;     // a mesma faixa de praia da ilha principal (arquipelago.js → PRAIA)
 const PASSO = 4, LONGE = 1e6, FUNDO = -38;
 const D8 = [[1, 0], [0.70710678, 0.70710678], [0, 1], [-0.70710678, 0.70710678], [-1, 0], [-0.70710678, -0.70710678], [0, -1], [0.70710678, -0.70710678]];
@@ -37,6 +39,7 @@ const D8 = [[1, 0], [0.70710678, 0.70710678], [0, 1], [-0.70710678, 0.70710678],
 // borda: recorte da costa em três escalas (fração do raio) · raso/talude: até onde vai a plataforma clara e onde o
 // fundo chega ao oceano aberto (m da costa) · alc: até onde pode haver terra (× raio) · T, M: clima do tema
 export const TEMAS = {
+  xogunato: { id: T_XOGUNATO, nome: 'Japão do xogunato', T: 0.55, M: 0.71, borda: [0.12, 0.075, 0.035], raso: 43, talude: 147, alc: 1.3 },
   floresta: { id: T_FLORESTA, nome: 'floresta densa', T: 0.50, M: 0.92, borda: [0.22, 0.11, 0.05], raso: 34, talude: 150, alc: 1.42 },
   vulcao: { id: T_VULCAO, nome: 'vulcão', T: 0.60, M: 0.78, borda: [0.13, 0.07, 0.035], raso: 26, talude: 130, alc: 1.3 },
   neve: { id: T_NEVE, nome: 'montanhas nevadas', T: 0.26, M: 0.74, borda: [0.20, 0.12, 0.06], raso: 30, talude: 140, alc: 1.42, ex: 1.2, ez: 0.86 },
@@ -244,6 +247,7 @@ export function criarIlha(ficha, sementeMundo, ruidoMar) {
       }
       return h;
     }
+    if (tema === T_XOGUNATO) return relevoEdo(x-cx,z-cz,n);
     // metrópole: patamar plano para a cidade (as ruas, os prédios e o estádio são de shared/cidade.js)
     return 3.0;
   }
@@ -321,6 +325,7 @@ export function criarIlha(ficha, sementeMundo, ruidoMar) {
   // árvore sorteada na célula: `a` = { kind, dens, th, rad, clareira } já com a regra geral; devolve false para tirar.
   // praia = distância com sinal à costa quando o ponto está na faixa da praia (senão null); r2, r3 = sorteios 0..1
   il.arvore = (a, x, z, y, sea, praia, r2, r3) => {
+    if (tema === T_XOGUNATO && il.semPlanta(x,z)) return false;
     if (tema === T_NEVE) { if (a.kind === 5) return false; if (a.kind !== 1) { a.kind = 1; a.dens = 0.5; } a.dens = Math.max(a.dens, y - sea > 26 ? 0.2 : 0.8); a.clareira = 0.55; return true; }
     if (tema === T_FLORESTA) {
       if (a.kind === 5) return true;
@@ -361,6 +366,23 @@ export function criarIlha(ficha, sementeMundo, ruidoMar) {
   // rocha de dentro (o que aparece em paredão e quando se cava): basalto no cone do vulcão
   il.rocha = (x, z) => (tema === T_VULCAO && il.cone(x, z) > 0.1 ? B.BASALT : B.STONE);
   il.liquido = B.MAGMA;   // o que enche o lago da cratera (ver lava)
+
+  if (tema === T_XOGUNATO) {
+    let vila;
+    il.semPlanta = (x,z) => (Math.abs(x-cx) <= 157 && z-cz >= -107 && z-cz <= 186) ||
+      (Math.abs(x-cx) <= 4 && z-cz > 153 && z-cz < 297);
+    il.obras = (x0,z0,set,alt) => {
+      // Estradinha acompanha o relevo até a areia do cais, através da faixa de mata.
+      if (x0 <= cx+2 && x0+15 >= cx-2 && z0 <= cz+296 && z0+15 >= cz+154) {
+        for(let x=Math.max(x0,cx-2);x<=Math.min(x0+15,cx+2);x++)
+          for(let z=Math.max(z0,cz+154);z<=Math.min(z0+15,cz+296);z++)
+            set(x,alt(x,z),z,Math.abs(x-cx)===2?B.STONE_BRICKS:B.GRAVEL);
+      }
+      if (x0+15 < cx-160 || x0 > cx+160 || z0+15 < cz-109 || z0 > cz+187) return;
+      vila ??= criarVilaEdo(cx,cz);
+      vila(x0,z0,set);
+    };
+  }
 
   // metrópole: ruas, prédios e estádio são obra do próprio mundo (shared/cidade.js), montada na primeira consulta
   if (tema === T_METROPOLE) {

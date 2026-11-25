@@ -7,6 +7,7 @@
 // Desenha em ladrilhos de 128 px guardados por escala, preenchidos aos poucos (≤ 7 ms por quadro): não engasga o jogo.
 import { B, BLOCKS, KIND, K_CROSS, LEVEL } from '../../shared/blocks.js';
 import { SEA } from '../../shared/constants.js';
+import { MARCOS_EDO } from '../../shared/xogunato.js';
 import { BIOME } from '../../shared/worldgen.js';
 
 const T = 128, ESCALAS = [0.5, 1, 2, 4, 8, 16];
@@ -155,7 +156,11 @@ export function initMapa({ game, world, player, avatars, net, openOverlay, close
         for (const L of bal.linhas) { ctx.beginPath(); for (let k = 0; k < L.xs.length; k += salto) { if (k) ctx.lineTo(px(L.xs[k]), pz(L.zs[k])); else ctx.moveTo(px(L.xs[k]), pz(L.zs[k])); } ctx.lineTo(px(L.xs[L.xs.length - 1]), pz(L.zs[L.zs.length - 1])); ctx.stroke(); }
         ctx.restore();
       }
-      for (const il of arqM.ilhas) marca(il.x, il.z, '🏝', il.nome, '#d8f4ff');
+      for (const il of arqM.ilhas) {
+        marca(il.x, il.z, il.ficha.tema === 'xogunato' ? '🏯' : '🏝', il.nome, '#d8f4ff');
+        if (il.ficha.tema === 'xogunato' && esc <= 1.5)
+          for (const m of MARCOS_EDO) marca(il.x+m.x, il.z+m.z, '◆', m.nome, '#ffdaa9');
+      }
       for (const q of bal?.portos || []) marca(q.espera[0], q.espera[2], '⚓', q.id === 'principal' ? 'cais' : '', '#ffe9c2');
       for (const e of bal?.estados || []) if (e.x !== undefined) marca(e.x, e.z, '⛴', '', '#fff');
     }

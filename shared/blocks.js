@@ -30,7 +30,7 @@ export const TEXTURES = [
   // classe 2 — tinta de grama em tudo
   'grass_top', 'tall_grass', 'fern',
   // classe 3 — tinta de folhagem em tudo
-  'leaves', 'pine_leaves',
+  'leaves', 'pine_leaves', 'sakura',
 ];
 export const TEX_INDEX = Object.fromEntries(TEXTURES.map((n, i) => [n, i]));
 export const TINT_B0 = TEX_INDEX.grass_side;  // início da classe 1
@@ -70,7 +70,7 @@ export const B = {
   // (shared/minerios.js: faixas de fundura, raridade e valor). Camadas de textura emprestadas até o Astra desenhar as
   // próprias (contrato no topo de shared/minerios.js).
   DEEP_STONE: 110, SAPPHIRE_ORE: 111, EMERALD_ORE: 112, RUBY_ORE: 113, DIAMOND_ORE: 114,
-  MAGMA: 115, SUPER_BOMBA: 116,
+  MAGMA: 115, SUPER_BOMBA: 116, SAKURA: 117,
   VISAO: 126,   // visão unilateral (23/11): por fora a face do bloco escolhido, por dentro transparente (shared/minis.js → VISAO_BASE)   // crosta de lava com frestas acesas: o lago da cratera e os veios do vulcão (shared/ilhas.js)
 };
 
@@ -79,7 +79,7 @@ export const STAIR_IDS = [
   B.STAIR_PLANKS, B.STAIR_PINE, B.STAIR_STONE, B.STAIR_STONE_BRICKS,
   B.STAIR_BRICKS, B.STAIR_MARBLE, B.STAIR_SANDSTONE, B.STAIR_CONCRETE,
 ];
-export const BLOCK_COUNT = 117;
+export const BLOCK_COUNT = 118;
 const N = 128; // folga para os arrays tipados
 export const IS_GLASS = new Uint8Array(N);
 for (const id of GLASS_IDS) IS_GLASS[id] = 1;
@@ -145,6 +145,7 @@ function def(id, o) {
 }
 
 def(B.AIR, { natural: true, name: 'Ar', kind: K_AIR, hard: 0, placeable: false, drop: 0 });
+def(B.SAKURA, { natural: true, name: 'Cerejeira em flor', kind: K_CUTOUT, tex: 'sakura', hard: 0.2, sound: 'leaves', skyDrop: 1 });
 def(B.BEDROCK, { natural: true, name: 'Rocha-mãe', tex: 'bedrock', hard: Infinity, placeable: false, sound: 'stone' });
 def(B.STONE, { natural: true, name: 'Pedra', tex: 'stone', hard: 1.4, sound: 'stone' });
 def(B.DIRT, { natural: true, name: 'Terra', tex: 'dirt', hard: 0.5, sound: 'dirt' });
@@ -294,7 +295,7 @@ export function rotateYaw(id, steps) {
 // Ordem da paleta do modo criativo.
 export const PALETTE = [
   B.GRASS, B.DIRT, B.STONE, B.SAND, B.GRAVEL, B.CLAY, B.SANDSTONE, B.BASALT, B.DEEP_STONE, B.MAGMA, B.SNOW, B.ICE,
-  B.LOG, B.PLANKS, B.STAIR_PLANKS, B.PINE_LOG, B.PINE_PLANKS, B.STAIR_PINE, B.LEAVES, B.PINE_LEAVES, B.CACTUS,
+  B.LOG, B.PLANKS, B.STAIR_PLANKS, B.PINE_LOG, B.PINE_PLANKS, B.STAIR_PINE, B.LEAVES, B.PINE_LEAVES, B.SAKURA, B.CACTUS,
   B.STONE_BRICKS, B.BRICKS, B.MARBLE, B.CONCRETE,
   B.STAIR_STONE, B.STAIR_STONE_BRICKS, B.STAIR_BRICKS, B.STAIR_MARBLE, B.STAIR_SANDSTONE, B.STAIR_CONCRETE,
   B.ROOF, B.STEEL, B.GOLD_BLOCK, ...GLASS_IDS, B.LAMP,

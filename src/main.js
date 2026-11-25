@@ -85,6 +85,8 @@ import { initTransito } from './game/transito.js';         // carros, viaturas, 
 import { initVulcao } from './game/vulcao.js';   // penacho de fumaça e clarão da cratera da Ilha do Vulcão
 import { initIlhasProps } from './game/ilhas-props.js';   // modelos 3D (.glb Meshy) das ilhas, cais e bóias de canal
 import { mapaSolo, sementeArquipelago } from '../shared/mapa-solo.js';
+import { ILHA_XOGUNATO, ENTRADA_EDO } from '../shared/xogunato.js';
+import { initXogunato } from './game/xogunato.js';
 import { initFerrovia } from './game/ferrovia.js';
 import { initGaragem } from './game/veiculos-kids.js';
 import { estadoComVeiculo } from '../shared/presenca-veiculos.js';
@@ -299,7 +301,12 @@ const net = createNet({
         if (pos) store.set('off.pos.' + slug, pos);
       }
     }
-    if (terreno === 'ilhas') startWorld(sementeArquipelago, 0, { mapa: mapaSolo, fortaleza: posicaoFortalezaSolo(store,slug) });
+    if (terreno === 'ilhas') {
+      const visitar = slug === 'xogunato';
+      const mapa = visitar ? { ...mapaSolo, ilhas: [...mapaSolo.ilhas, ILHA_XOGUNATO] } : mapaSolo;
+      const chegada = visitar ? { x: ILHA_XOGUNATO.x + ENTRADA_EDO[0], y: ENTRADA_EDO[1], z: ILHA_XOGUNATO.z + ENTRADA_EDO[2] } : null;
+      startWorld(sementeArquipelago, 0, { mapa, fortaleza: posicaoFortalezaSolo(store,slug) }, chegada);
+    }
     else startWorld(seedFromString('lavra:' + slug));
     for (const p of store.get('off.crateras.' + slug, []) || []) world.registrarCratera(p);
     world.loadEdits(store.get('off.' + slug, {}));
@@ -461,7 +468,16 @@ const ui = createUI({
       }
       const k = text === '/nano' ? 'nano' : text === '/macro' ? 'macro' : text === '/normal' ? 'normal' : '';
       // /inicio: volta ao ponto do primeiro nascimento neste mundo (o mesmo cálculo da primeira entrada, sem a posição salva)
-      if (text === '/inicio') {
+      if (net.offline && /^\/jap[aã]o$/i.test(text)) {
+        const ilha = game.gen?.arq?.ilhas.find(i => i.ficha.tema === 'xogunato');
+        if (!ilha || game.dim !== 0) ui.toast('Na partida solo, abra o mundo Xogunato para visitar a ilha.');
+        else {
+          if (game.garagem?.atual) game.garagem.sair();
+          player.teleport(ilha.x+ENTRADA_EDO[0],ENTRADA_EDO[1],ilha.z+ENTRADA_EDO[2]);
+          player.yaw=0; player.pitch=0; savePosition();
+          ui.toast('Ilha do Xogunato · abra o mapa para descobrir os castelos e os templos.');
+        }
+      } else if (text === '/inicio') {
         if (game.dim !== 0) ui.toast('O início fica no plano normal: use /normal antes.');
         else { placePlayer(true); savePosition(); ui.toast('De volta ao ponto onde você nasceu a primeira vez neste mundo.'); }
       } else if (text === '/tronco' || text === '/tronco redondo' || text === '/tronco quadrado') {
@@ -560,6 +576,7 @@ game.trator = initTrator({ game, player, world, net, ui, scene, input });
 game.perfurador = initPerfurador({ game, player, net, ui, scene, input });
 initVulcao({ game, scene, camera });
 initIlhasProps({ game, scene, camera });
+initXogunato({ game, scene, player, world });
 initCidadeLonge({ game, scene, camera, world });
 initTransito({ game, scene, camera, world });
 initMapa({ game, world, player, avatars, net, openOverlay, closeOverlay, device });
@@ -655,12 +672,12 @@ addEventListener('beforeunload', (e) => {
 });
 
 // ---- mundo ---------------------------------------------------------------------------------
-function startWorld(seed, dim = 0, opt = null) {
+function startWorld(seed, dim = 0, opt = null, chegada = null) {
   game.seed = seed >>> 0;
   game.foraDoSalao = null;
   game.dim = dim;
   game.gen = createWorldGen(game.seed, dim, opt);
-  game.spawn = game.gen.findSpawn();
+  game.spawn = chegada ?? game.gen.findSpawn();
   world.reset(game.seed, dim, opt);
   player.teleport(game.spawn.x, game.spawn.y, game.spawn.z);
   game.ready = true;

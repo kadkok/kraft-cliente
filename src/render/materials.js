@@ -441,7 +441,7 @@ void main() {
   vTint = tm == 1 ? grassColor(cl) : tm == 2 ? leafColor(cl) : tm == 3 ? vec3(0.85, 0.05, 0.02) : vec3(1.0);
 #endif
 #if !defined(WATER) && !defined(MC)
-  if (aPos.w >= ${TINT_D0}.0) vTint = leafColor(cl);
+  if (aPos.w >= ${TINT_D0}.0) vTint = aPos.w == ${TEX_INDEX.sakura}.0 ? vec3(1.0) : leafColor(cl);
   else if (aPos.w >= ${TINT_C0}.0) vTint = grassColor(cl);
   else if (aPos.w >= ${TINT_B0}.0) { vTint = grassColor(cl); vMask = 1.0; }
 #endif
